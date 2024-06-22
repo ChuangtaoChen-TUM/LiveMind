@@ -25,9 +25,18 @@
     <em>(a) LiveMind inference with Llama-3-70B model; (b) LiveMind collaborative inference with Llama-3-70B and Llama-3-8B models; (c) Conventional CoT inference.</em>
 </p>
 
-# Usage
-
-## Configurations
+## Contents
+- [Contents](#contents)
+- [Reproduce Experimental Results](#reproduce-experimental-results)
+  - [Configurations](#configurations)
+  - [Run real-time estimation](#run-real-time-estimation)
+  - [Run batched inference](#run-batched-inference)
+  - [Result analysis](#result-analysis)
+  - [Action analysis](#action-analysis)
+- [Playground](#playground)
+- [Citation](#citation)
+## Reproduce Experimental Results
+### Configurations
 Install required packages:
 ```
 pip install datasets alive_progress nltk
@@ -40,7 +49,10 @@ Before running the script, you need to change the following configurations in `l
 ```
 pip install vllm transformers
 ```
-## Run real-time estimation
+
+5. Models used in the paper: [Llama-3-70B](https://huggingface.co/casperhansen/llama-3-70b-instruct-awq/), [Llama-3-8B](https://huggingface.co/casperhansen/llama-3-8b-instruct-awq/)
+
+### Run real-time estimation
 Run the following commands to reproduce the results of real-time estimation:
 ```
 python run_solver.py --model llama-3-70b --use_lm --output_file ./output/mmlu_pro/time_info/llama_3_70b_lm/all.json
@@ -48,7 +60,7 @@ python run_solver.py --model llama-3-70b --output_file ./output/mmlu_pro/time_in
 python run_solver.py --model llama-3-70b --assist_model llama-3-8b --use_lm --action_set SAS --output_file ./output/mmlu_pro/time_info/llama_3_70b_w_8b_lm/all.json
 python run_solver.py --model llama-3-8b --output_file ./output/mmlu_pro/time_info/llama_3_8b_base/all.json
 ```
-## Run batched inference
+### Run batched inference
 Run the following commands to reproduce the results of batched inference:
 ```
 python run_batch_solver.py --model llama-3-70b --use_lm --output_file ./output/mmlu_pro/batched/llama_3_70b_lm/all.json
@@ -57,9 +69,9 @@ python run_batch_solver.py --model llama-3-70b --use_lm --assist_model llama-3-8
 python run_batch_solver.py --model llama-3-8b --output_file ./output/mmlu_pro/batched/llama_3_8b_base/all.json
 ```
 
-## Result analysis
+### Result analysis
 Run the following commands to analyze the output files and reproduce the experiment results:
-### Real-time latency measure
+#### Real-time latency measure
 ```
 python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_70b_lm/all.json
 python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_70b_base/all.json
@@ -68,7 +80,7 @@ python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_8b_base/all.json
 ```
 
 This step will create two csv files: `timeinfo_by_category.csv` and `timeinfo_by_len.csv` at each folder with the `all.json` file.
-### Batched inference
+#### Batched inference
 ```
 python analyze_batched.py ./output/mmlu_pro/batched/llama_3_70b_lm/all.json
 python analyze_batched.py ./output/mmlu_pro/batched/llama_3_70b_base/all.json
@@ -77,17 +89,17 @@ python analyze_batched.py ./output/mmlu_pro/batched/llama_3_8b_base/all.json
 ```
 This step will create two csv files: `timeinfo_by_category.csv` and `timeinfo_by_len.csv` at each folder with the `all.json` file.
 
-## Action analysis
+### Action analysis
 Run the following commands to reproduce the results present in Sec. 4.4 in the paper:
 
-### Action percentage
+#### Action percentage
 ```
 python analyze_actions.py ./output/mmlu_pro/batched/llama_3_70b_lm/all.json
 python analyze_actions.py ./output/mmlu_pro/batched/llama_3_70b_w_8b_lm/all.json
 ```
 This step will create two csv files: `actions_per_step` and `actions_per_len` in these two folders, corresponding to the data presented in Fig. 8.
 
-### Action set
+#### Action set
 To reproduce the results in Table 2, first run the batched inference with the following configurations:
 ```
 python run_batch_solver.py --model llama-3-8b --use_lm --action_set CAS --output_file ./output/mmlu_pro/ablation/llama_3_8b_lm_comp/all.json
@@ -100,10 +112,32 @@ python run_batch_solver.py --model llama-3-70b --use_lm --assist_model llama-3-8
 
 Then run `python analyze_batched.py **/all.json` to report the results.
 
-#### Citation
+## Playground
+We impleted a demo with [textual](https://textual.textualize.io/).
+**In this demo, you can interact with LLMs through the LiveMind framework, allowing the LLM to take actions as you type in the text box!**
 
-To cite this paper, use:
+To run this demo, you need to install `vllm`, `transformers` and `textual`:
+```
+pip install textual vllm transformers
+```
+then, set the model paths in `playground/config.py` with your own model paths. The paths should contain a `config.json` file and a `tokenizer.json` file. You can download the models from huggingface. For example, [Llama-3-70B](https://huggingface.co/casperhansen/llama-3-70b-instruct-awq/), [Llama-3-8B](https://huggingface.co/casperhansen/llama-3-8b-instruct-awq/).
 
+Then, you can run the demo using:
+```
+python run_playground.py --textual --model llama-3-70b --use_lm
+```
+
+when using `--use_lm`, the model is running in LiveMind mode, which means it can inference when you are typing. Click the **send** button to send the message.
+
+![alt text](./res/02_demo_lm.png)
+The actions performed by the LLM are not displayed in the chat window. To see the model actions, include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
+
+If you do not include `--use_lm`, the chat will be running in normal mode without the LiveMind framework.
+![alt text](./res/03_demo_baseline.png)
+
+## Citation
+
+To cite our work:
 ```
 @article{chen2024livemind,
       title={{LiveMind}: Low-latency Large Language Models with Simultaneous Inference},
