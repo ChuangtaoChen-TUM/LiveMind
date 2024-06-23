@@ -34,6 +34,8 @@
   - [Result analysis](#result-analysis)
   - [Action analysis](#action-analysis)
 - [Playground](#playground)
+  - [Gradio Demo](#gradio-demo)
+  - [Textual Demo](#textual-demo)
 - [Citation](#citation)
 ## Reproduce Experimental Results
 ### Configurations
@@ -113,20 +115,35 @@ python run_batch_solver.py --model llama-3-70b --use_lm --assist_model llama-3-8
 Then run `python analyze_batched.py **/all.json` to report the results.
 
 ## Playground
-We impleted a demo with [textual](https://textual.textualize.io/).
-**In this demo, you can interact with LLMs through the LiveMind framework, allowing the LLM to take actions as you type in the text box!**
-
-To run this demo, you need to install `vllm`, `transformers` and `textual`:
+We impleted a demo with [gradio](https://www.gradio.app/) and [textual](https://textual.textualize.io/). **In the demos, you can interact with LLMs through the LiveMind framework, allowing the LLM to take actions as you type in the text box!**
+To run the demo, you need to install `vllm` and `transformers`:
 ```
-pip install textual vllm transformers
+pip install vllm transformers
+```
+To run the demo in gradio, you need to install `gradio`; to run the demo in `textual`, you need to install `textual` (you can select either):
+```
+pip install textual
+pip install gradio
 ```
 then, set the model paths in `playground/config.py` with your own model paths. The paths should contain a `config.json` file and a `tokenizer.json` file. You can download the models from huggingface. For example, [Llama-3-70B](https://huggingface.co/casperhansen/llama-3-70b-instruct-awq/), [Llama-3-8B](https://huggingface.co/casperhansen/llama-3-8b-instruct-awq/).
+### Gradio Demo
+Run the demo in **gradio**, use
+```
+python run_playground.py --gradio --model llama-3-70b --use_lm
+```
+Type your message in the text box and press enter to send the message, you can change wether to use the `LiveMind` (LM) framework by clicking the checkbox.
 
-Then, you can run the demo using:
+![alt text](./res/04_gradio_demo.png)
+
+In `LiveMind` inference mode, the model can perform inferences when you are typing. The actions performed by the LLM will be displayed in your terminal. You can also include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
+
+You can use `--assist-model [model_name]` to use a different model as the output model, as mentioned in the paper.
+
+### Textual Demo
+You can also run the demo implemented with [textual](https://textual.textualize.io/) in your terminal, simply use:
 ```
 python run_playground.py --textual --model llama-3-70b --use_lm
 ```
-
 when using `--use_lm`, the model is running in LiveMind mode, which means it can inference when you are typing. Click the **send** button to send the message.
 
 ![alt text](./res/02_demo_lm.png)

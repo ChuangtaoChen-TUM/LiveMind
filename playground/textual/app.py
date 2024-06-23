@@ -1,5 +1,4 @@
 import re
-import logging
 from textual.containers import ScrollableContainer, Horizontal, Vertical
 from textual.widgets import Header, Footer, Button, TextArea
 from textual.app import App
@@ -10,12 +9,6 @@ from .component import MessageWrapper, ReactMessageWrapper, ReactChatMessage
 from ..action_manager import ActionManager
 from ..utils import form_prompt
 
-logging.basicConfig(
-    filename='./playground/log.log',  # Log file name
-    level=logging.INFO,   # Log level
-    format='%(asctime)s - %(levelname)s - %(message)s'  # Log format
-)
-
 class ChatbotApp(App):
     CSS_PATH = "./style/style.tcss"
     TITLE = "Chatbot"
@@ -23,10 +16,11 @@ class ChatbotApp(App):
     def __init__(
             self,
             model_name: str,
+            assist_model_name: str,
             stream_method:Callable[[str], AsyncGenerator],
             assist_stream_method:Callable[[str], AsyncGenerator] = None,
             use_lm:bool = True,
-            log:bool = False
+            logger=None
         ):
         super().__init__()
         self.stream = stream_method
@@ -35,10 +29,13 @@ class ChatbotApp(App):
         self.chat_history = [
         ]
         self.action_manager = ActionManager()
-        self.title = "Chatbot: " + model_name
+        if assist_model_name:
+            self.title = "Chatbot: " + model_name + "+" + assist_model_name
+        else:
+            self.title = "Chatbot: " + model_name
         self.running_task = None
         self.response = None
-        self.log_enabled = log
+        self.logger = logger
 
 
     def compose(self):
@@ -160,8 +157,8 @@ class ChatbotApp(App):
             new_content += each
         self.response = new_content
         log(new_content)
-        if self.log_enabled:
-            logging.info(new_content)
+        if self.logger:
+            self.logger.info(new_content)
 
 
     async def get_response(self, dialogs):
@@ -185,7 +182,7 @@ class ChatbotApp(App):
             response_widget.scroll_visible()
 
         response_widget.remove()
-        if self.log_enabled:
-            logging.info(new_content)
+        if self.logger:
+            self.logger.info(new_content)
         new_msg = {"role": "assistant", "content": new_content}
         await self.send_message(new_msg)

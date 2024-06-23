@@ -19,14 +19,16 @@ class Session:
         assert model in ["llama-3-8b", "llama-3-70b"]
         if model == "llama-3-8b":
             model_path = LLAMA_3_8B_PATH
+            gpu_memory_utilization = 0.3
         elif model == "llama-3-70b":
             model_path = LLAMA_3_70B_PATH
+            gpu_memory_utilization = 0.6
         if model_path == "":
             raise ValueError(f"Please specify the path to the model {model}")
         self.model_name = model
         self.generator = ItervLLM(
             model_path, model_path, tensor_parallel_size=1,
-            gpu_memory_utilization=0.9,
+            gpu_memory_utilization=gpu_memory_utilization,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.tokenizer.pad_token = self.tokenizer.eos_token

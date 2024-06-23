@@ -15,7 +15,7 @@ from live_mind.default import MMLU_FORMAT, get_model
 
 # Configure logging
 logging.basicConfig(
-    filename='error.log',  # Log file name
+    filename='./output/mmlu_pro/log.log',  # Log file name
     level=logging.INFO,   # Log level
     format='%(asctime)s - %(levelname)s - %(message)s'  # Log format
 )
