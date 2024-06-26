@@ -1,6 +1,6 @@
 __all__ = [
     'LIVE_SYS_MSG',
-    'FINAL_LIVE_MSG', 
+    'FINAL_LIVE_MSG',
     'FULL_SYS_MSG', 
     'USE_COMP',
     'USE_OPTION',
@@ -9,10 +9,11 @@ __all__ = [
     'MMLU_FORMAT',
     'LLAMA_3_8B_PATH',
     'LLAMA_3_70B_PATH',
+    'MMLU_PRO_PATH',
     'get_model'
 ]
 
-from ..config import LLAMA_3_8B_PATH, LLAMA_3_70B_PATH, get_model
+from ..config import LLAMA_3_8B_PATH, LLAMA_3_70B_PATH, get_model, MMLU_PRO_PATH
 SIMP_LIVE_SYS_MSG = """You are a helpful AI assistant. Your task is to understand and solve an incomplete problem. Based on the information provided and your previous actions, you can choose one of the following actions:
 
 action inference: understand and make inferences based on the available information.
