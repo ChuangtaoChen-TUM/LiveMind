@@ -17,7 +17,7 @@
 <div align="center">
 
 <a href='https://arxiv.org/abs/2406.14319'><img src='https://img.shields.io/badge/arXiv-2406.14319-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
- <a href=''><img src='https://img.shields.io/badge/License-MIT-blue'></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ <a href='https://github.com/ChuangtaoChen-TUM/LiveMind/blob/master/LICENSE'><img src='https://img.shields.io/badge/License-MIT-blue'></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </div>
 
 <p align="center">
