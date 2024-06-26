@@ -1,9 +1,3 @@
-#input_container {
-    dock: bottom;
-    layout: horizontal;
-    height: auto;
-    padding: 1;
-}
 #text_area_container {
     width: 80%;
 }

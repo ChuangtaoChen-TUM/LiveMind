@@ -9,7 +9,7 @@ if __name__ == "__main__":
     parser.add_argument("--textual", action="store_true", help="Run the textual interface")
     parser.add_argument("--gradio", action="store_true", help="Run the Gradio interface")
     parser.add_argument("--model", type=str, help="inference model")
-    parser.add_argument("--assist-model", type=str, help="assist model")
+    parser.add_argument("--assist_model", type=str, help="assist model")
     parser.add_argument("--use_lm", action="store_true", help="Use LiveMind framework")
     parser.add_argument("--log", action="store_true", help="Enable logging")
     args = parser.parse_args()

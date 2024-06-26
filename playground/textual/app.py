@@ -8,6 +8,7 @@ from textual import log
 from .component import MessageWrapper, ReactMessageWrapper, ReactChatMessage
 from ..action_manager import ActionManager
 from ..utils import form_prompt
+SYS_MSG_BASE = "You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."
 
 class ChatbotApp(App):
     CSS_PATH = "./style/style.tcss"
@@ -131,7 +132,8 @@ class ChatbotApp(App):
                 is_completed=True
             )
         else:
-            new_prompts = self.chat_history + [new_msg,]
+            sys_msg = [{"role": "system", "content": SYS_MSG_BASE},]
+            new_prompts = sys_msg + self.chat_history + [new_msg,]
         await self.send_message(new_msg)
         input_widget.text = ""
         if self.running_task and not self.running_task.done():

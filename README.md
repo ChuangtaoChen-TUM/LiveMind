@@ -21,8 +21,12 @@
 </div>
 
 <p align="center">
-    <img src="./res/01_overview.png" alt>
-    <em>(a) LiveMind inference with Llama-3-70B model; (b) LiveMind collaborative inference with Llama-3-70B and Llama-3-8B models; (c) Conventional CoT inference.</em>
+    <img src="./res/01_overview.png" alt width="700" >
+    <em><br>(a) LiveMind inference with Llama-3-70B model; (b) LiveMind collaborative inference with Llama-3-70B and Llama-3-8B models; (c) Conventional CoT inference.</em>
+</p>
+
+<p align="center">
+<video src="./res/preview.mp4" width="720" controls></video><em><br>A Demo with gradio of conventional Chain-of-Thought inference (left) and LiveMind simultanous inference (right) with streaming input. See `Playground` section for more information. </em>
 </p>
 
 ## Contents
@@ -32,7 +36,11 @@
   - [Run real-time estimation](#run-real-time-estimation)
   - [Run batched inference](#run-batched-inference)
   - [Result analysis](#result-analysis)
+    - [Real-time latency measure](#real-time-latency-measure)
+    - [Batched inference](#batched-inference)
   - [Action analysis](#action-analysis)
+    - [Action percentage](#action-percentage)
+    - [Action set](#action-set)
 - [Playground](#playground)
   - [Gradio Demo](#gradio-demo)
   - [Textual Demo](#textual-demo)
@@ -133,11 +141,13 @@ python run_playground.py --gradio --model llama-3-70b --use_lm
 ```
 Type your message in the text box and press enter to send the message, you can change wether to use the `LiveMind` (LM) framework by clicking the checkbox.
 
-![alt text](./res/04_gradio_demo.png)
+<p align="center">
+  <img src="./res/04_gradio_demo.png" alt="drawing" width="500"/>
+</p>
 
-In `LiveMind` inference mode, the model can perform inferences when you are typing. The actions performed by the LLM will be displayed in your terminal. You can also include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
+In `LiveMind` inference mode, the model can perform inferences when you are typing. The actions performed are displayed in the **Actions** textbox. You can also include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
 
-You can use `--assist-model [model_name]` to use a different model as the output model, as mentioned in the paper.
+You can use `--assist_model [model_name]` to use a different model as the output model, as mentioned in the paper.
 
 ### Textual Demo
 You can also run the demo implemented with [textual](https://textual.textualize.io/) in your terminal, simply use:
@@ -146,11 +156,14 @@ python run_playground.py --textual --model llama-3-70b --use_lm
 ```
 when using `--use_lm`, the model is running in LiveMind mode, which means it can inference when you are typing. Click the **send** button to send the message.
 
-![alt text](./res/02_demo_lm.png)
+<p align="center">
+  <img src="./res/02_demo_lm.png" alt="drawing" width="500"/>
+</p>
+
+
 The actions performed by the LLM are not displayed in the chat window. To see the model actions, include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
 
 If you do not include `--use_lm`, the chat will be running in normal mode without the LiveMind framework.
-![alt text](./res/03_demo_baseline.png)
 
 ## Citation
 

@@ -9,7 +9,7 @@ CSS ="""
 #component-0 { height: 100%; }
 #chatbot { flex-grow: 1; overflow: auto;}
 """
-
+SYS_MSG_BASE = "You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."
 class LMGradioInterface:
     def __init__(self, session: Session, assist_session: Session = None, use_lm: bool=True, logger=None):
         self.session = session
@@ -27,11 +27,12 @@ class LMGradioInterface:
             title = self.session.model_name
         with gr.Blocks(css=CSS, title=title) as demo:
             chatbot = gr.Chatbot(elem_id="chatbot")
-            msg = gr.Textbox(placeholder="Type here...")
+            infer_box = gr.Textbox("", interactive=False, label="Actions", max_lines=15)
+            msg = gr.Textbox(placeholder="Type here...", label="Input")
             clear = gr.Button("Clear")
             use_lm = gr.Checkbox(label="Use LM framework", value=self.use_lm)
             def user(user_message, history):
-                return "", history + [[user_message, None]]
+                return "", history + [[user_message, None]], ""
 
             def bot(history, use_lm):
                 converted_history = convert_history(history)
@@ -43,7 +44,7 @@ class LMGradioInterface:
                         is_completed=True
                     )
                 else:
-                    new_prompts = converted_history
+                    new_prompts = [{"role": "system", "content": SYS_MSG_BASE},] + converted_history
                 while self.is_busy:
                     time.sleep(0.1)
                 self.is_busy = True
@@ -74,13 +75,16 @@ class LMGradioInterface:
                 else:
                     return
 
-            def action_change(text, use_lm):
-                if not use_lm:
+            def action_change(text, use_lm, infer_box):
+                if not use_lm or self.is_busy:
+                    yield infer_box
                     return
-                if self.is_busy:
-                    return
-                actions, prompts = self.action_manager.read_action(text, save_prompts=True)
+                actions, prompts = self.action_manager.read_action(
+                    text, save_prompts=True
+                )
+                infer_box = "\n".join(actions)
                 if prompts is None or len(actions) >= len(prompts):
+                    yield infer_box
                     return
 
                 self.is_busy = True
@@ -91,19 +95,25 @@ class LMGradioInterface:
                     is_completed=False
                 )
                 self.session.chat_complete(new_prompts)
-                response = self.session.flush()
-                print("new action: "+response)
+                response = ""
+                if infer_box:
+                    infer_box += "\n"
+                for next_text in self.session.stream():
+                    response += next_text
+                    infer_box += next_text
+                    yield infer_box
+                yield infer_box
                 if self.logger:
                     self.logger.info(response)
                 self.is_busy = False
                 save_action(response)
 
 
-            msg.submit(user, [msg, chatbot], [msg, chatbot], queue=False).then(
+            msg.submit(user, [msg, chatbot], [msg, chatbot, infer_box], queue=False).then(
                 bot, [chatbot, use_lm], chatbot
             )
 
-            msg.change(action_change, [msg, use_lm])
+            msg.change(action_change, [msg, use_lm, infer_box], [infer_box], show_progress=False)
             clear.click(lambda: None, None, chatbot, queue=False)
         self.demo = demo
     
