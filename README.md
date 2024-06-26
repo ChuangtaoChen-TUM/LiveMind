@@ -23,10 +23,7 @@
 <p align="center">
     <img src="./res/01_overview.png" alt width="700" >
     <em><br>(a) LiveMind inference with Llama-3-70B model; (b) LiveMind collaborative inference with Llama-3-70B and Llama-3-8B models; (c) Conventional CoT inference.</em>
-</p>
-
-<p align="center">
-<video src="./res/preview.mp4" width="720" controls></video><em><br>A Demo with gradio of conventional Chain-of-Thought inference (left) and LiveMind simultanous inference (right) with streaming input. See `Playground` section for more information. </em>
+    <video src="https://github.com/ChuangtaoChen-TUM/LiveMind/assets/12672821/5670677b-7030-4584-b65d-4ee702c2d021" width="720" controls></video><em><br>A Demo with gradio of conventional Chain-of-Thought inference (left) and LiveMind simultanous inference (right) with streaming input. See `Playground` section for more information. </em>
 </p>
 
 ## Contents
