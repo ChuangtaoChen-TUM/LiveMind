@@ -27,7 +27,7 @@
 
 
 <p align="center">
-<video src="https://github.com/ChuangtaoChen-TUM/LiveMind/assets/12672821/5670677b-7030-4584-b65d-4ee702c2d021" width="720" controls></video><em><br>A Demo with gradio of conventional Chain-of-Thought inference (left) and LiveMind simultanous inference (right) with streaming input. See `Playground` section for more information. </em>
+<video src="https://cdn-uploads.huggingface.co/production/uploads/667544fe25c64f9273795f30/P4dNn8WAlUIgvltk6TJaM.mp4" width="720" controls></video><em><br>A Demo with gradio of conventional Chain-of-Thought inference (left) and LiveMind simultanous inference (right) with streaming input. See `Playground` section for more information. </em>
 </p>
 
 ## Contents
