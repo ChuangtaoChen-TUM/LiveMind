@@ -16,7 +16,7 @@ Each response is in OpenAI's format, we need to use the:
 """
 import re
 import logging
-from ..utils.text.text_generator import BatchTextGenerator, build_delay_fn_char
+from ..utils.text.streamer import BatchTextGenerator, build_delay_fn_char
 from ..default import (
     message_formatter,
     FULL_SYS_MSG,
