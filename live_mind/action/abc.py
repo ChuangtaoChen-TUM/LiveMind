@@ -61,29 +61,30 @@ class BaseActionCache(ABC):
 class BaseActionFormatter(ABC):
     """ Base class for the action formatter.
     methods:
-    - sys_formatter: format the system prompt based on action configurations
-    - prompt_formatter: format the prompt based on the performed actions and the prompt
-    - final_sys_formatter: format the final system prompt based on action configurations
-    - final_prompt_formatter: format the final prompt based on the performed actions and the prompt
+    - format_inference: format the prompts for inference stage
+    - format_output: format the prompts for inference stage
     - parse_action: parse the action from the response
     """
     @abstractmethod
-    def sys_formatter(self, action_types: Iterable[ActionType]) -> str:
+    def format_inference(
+        self,
+        history_actions: list[Action],
+        new_prompts: list[str]
+    ) -> list[dict[str, str]]:
         pass
 
     @abstractmethod
-    def prompt_formatter(self, actions: list[Action], new_prompts: list[str]) -> str:
+    def format_output(
+        self,
+        history_actions: list[Action],
+        new_prompts: list[str]
+    ) -> list[dict[str, str]]:
         pass
 
     @abstractmethod
-    def final_sys_formatter(self, action_types: Iterable[ActionType]) -> str:
-        pass
-
-    @abstractmethod
-    def final_prompt_formatter(self, actions: list[Action], new_prompts: list[str]) -> str:
-        pass
-
-    @abstractmethod
-    def parse_action(self, response: str, action_types: Iterable[ActionType]) -> Action|None:
+    def parse_action(
+        self,
+        response: str,
+    ) -> Action|None:
         """ Read the action from the response. Return None if the parsing fails."""
         pass

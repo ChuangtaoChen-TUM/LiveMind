@@ -154,8 +154,7 @@ if __name__ == "__main__":
     else:
         controller = LMController(
             nltk_sent_segmenter,
-            LMFormatter(),
-            action_set,
+            LMFormatter(action_set),
             logger=logger
         )
 
