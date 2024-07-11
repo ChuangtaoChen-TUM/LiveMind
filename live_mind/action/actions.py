@@ -1,17 +1,14 @@
 """ This module contains the actions defined for the live_mind framework. """
 __all__ = [
-    'Infer',
+    'Inference',
     'Wait',
     'Response',
-    'Background',
-    'Hypothesize',
-    'Summarize'
+    'Hypothesize'
 ]
 
 from .abc import ActionType
-from .functions import modifier_summarize, none_fn
 
-Infer = ActionType(
+Inference = ActionType(
     name="inference",
     inst="understand and make inferences based on the available information."
 )
@@ -19,20 +16,11 @@ Infer = ActionType(
 Wait = ActionType(
     name="wait",
     inst="if you need more information or content, choose to wait.",
-    add_msg="If you choose action wait, simply respond with \"action wait.\" without any additional content.",
-    formatter=none_fn # do not display the action in the prompt
 )
 
-""" The special `response` action type will be used for multi-turn dialogues. Previous responses are stored 
-as historical `response` actions. """
 Response = ActionType(
     name="response",
     inst="response to the user's prompt based on the available information.",
-)
-
-Background = ActionType(
-    name="background",
-    inst="understand the topic background."
 )
 
 Hypothesize = ActionType(
@@ -42,6 +30,5 @@ Hypothesize = ActionType(
 
 Summarize = ActionType(
     name="summarize",
-    inst="summarize your previous actions and the current state of the problem.",
-    modifier=modifier_summarize
+    inst="summarize the history inferences."
 )

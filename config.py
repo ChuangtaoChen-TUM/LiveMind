@@ -1,13 +1,17 @@
 """ Configuration file """
 from abc import ABC, abstractmethod
-from typing import TypedDict
 # path to the MMLU-PRO dataset
 # /data2/NNdata/dataset/mmlu-pro/data/data/
-MMLU_PRO_PATH = ""
+MMLU_PRO_PATH = "/data2/NNdata/dataset/mmlu-pro/data/data/"
+# path to the GSM-8k dataset
+GSM8K_PATH = "/data2/NNdata/dataset/gsm8k/data/main"
 # config the model path if you use 'get_model_vllm_example'
-LLAMA_3_8B_PATH = "" # replace this with your own path
-LLAMA_3_70B_PATH = "" # replace this with your own path
+LLAMA_3_8B_PATH = "/data2/NNdata/model_file/llama3/llama3_8b_instruct_awq/model/" # replace this with your own path
+LLAMA_3_70B_PATH = "/data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/" # replace this with your own path
 # /data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/
+LLAMA_MODELS = ["llama-3-8b", "llama-3-70b"]
+OPENAI_MODELS = ["got-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+ANTHROPIC_MODELS = ["claude-3-5-sonnet", "claude-3-opus", "claude-3-sonnet"]
 """
 The get model function should return a model with the following methods:
 - chat_complete: takes a message and returns a response
@@ -45,19 +49,13 @@ the response is a dict and should have the following format:
 """
 
 def get_model(name: str):
-    assert name in ["llama-3-8b", "llama-3-70b"]
-    from chat_api import Session
-    name_dict = {
-        "llama-3-8b": "llama-3-8b-instruct-awq",
-        "llama-3-70b": "llama-3-70b-instruct-awq"
-    }
-    session = Session(name_dict[name], backend="autoawq", output_format="streaming")
-    class Model:
-        def chat_complete(self, message):
-            return session.chat_complete(message, result_format="openai")
-    return Model()
-    print("using get_model_vllm_example as the model function, you can replace this with your own implementation.")
-    return get_model_vllm_example(name) # You can also use this example implementation
+    assert name in LLAMA_MODELS + OPENAI_MODELS, f"Model {name} is not supported."
+    if name in LLAMA_MODELS:
+        print("using get_model_vllm_example as the model function, you can replace this with your own implementation.")
+        return get_model_vllm_example(name) # You can also use this example implementation
+    # elif name in OPENAI_MODELS:
+    #     print("using get_model_openai_example as the model function, you can replace this with your own implementation.")
+    #     return get_model_openai_example(name)
 
 def get_model_vllm_example(name: str) -> 'BaseModel':
     """ This is an example implementation of the model function using VLLM. You can replace this with your own implementation.
@@ -91,8 +89,8 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
         top_p=0.9,
         stop_token_ids=stop_token_ids,
     )
-    class Model:
-        def chat_complete(self, message):
+    class Model(BaseModel):
+        def chat_complete(self, message: list[dict]) -> str:
             prompts = tokenizer.apply_chat_template(
                 [message,],
                 tokenize=False,
@@ -102,12 +100,13 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
                 prompts
             )["input_ids"]
             input = inputs[0]
-            prompt_len = len(inputs[0])
-            vllm_results = model.generate(prompt_token_ids=inputs, sampling_params=param, use_tqdm=False)
+            vllm_results = model.generate(
+                prompt_token_ids=inputs,
+                sampling_params=param,
+                use_tqdm=False
+            )
             vllm_result = vllm_results[0]
             result = vllm_result.prompt_token_ids+vllm_result.outputs[0].token_ids
-            total_len = len(result)
-            gen_len = total_len - prompt_len
             # remove the input tokens from the output
             assert len(result) >= len(input)
             assert result[:len(input)] == input
@@ -120,28 +119,83 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
                 clean_up_tokenization_spaces=False,
                 skip_special_tokens=False
             )
-            output = {
-                "choices": [{"message": {"content": generated_texts[0], "role": "assistant"}}],
-                "usage": {
-                    "completion_tokens": gen_len,
-                    "prompt_tokens": prompt_len,
-                    "total_tokens": total_len
-                }
-            } 
-            return output
+            return generated_texts[0]
 
     model_with_chat_complete = Model()
     return model_with_chat_complete
 
 
-class Response(TypedDict):
-    """ Response from the model """
-    choices: list[dict[str, dict[str, str]]]
-    usage: dict[str, int]
+# def get_model_openai_example(name: str) -> 'BaseModel':
+#     import openai
+#     assert name in OPENAI_MODELS, f"Model {name} is not supported."
+#     client = openai.OpenAI()
+
+#     class Model(BaseModel):
+#         def chat_complete(self, message):
+#             response = client.chat.completions.create(
+#                 model=name,
+#                 messages=message,
+#                 temperature=0,
+#             )
+#             return response
+        
+#     model_with_chat_complete = Model()
+#     return model_with_chat_complete
+
+# def get_model_anthropic_example(name: str) -> 'BaseModel':
+#     import anthropic
+#     assert name in ANTHROPIC_MODELS, f"Model {name} is not supported."
+#     model_name_dict = {
+#         "claude-3-5-sonnet": "claude-3-5-sonnet-20240620",
+#         "claude-3-opus": "claude-3-opus-20240229",
+#         "claude-3-sonnet": "claude-3-sonnet-20240229"
+#     }
+#     client = anthropic.Anthropic()
+    
+#     class Model(BaseModel):
+#         def chat_complete(self, message):
+#             system_message, message = self._convert_to_anthropic_format(message)
+#             if system_message == "":
+#                 system_message = anthropic.NOT_GIVEN
+#             response = client.messages.create(
+#                 model=model_name_dict[name],
+#                 system=system_message,
+#                 messages=message,
+#                 temperature=0,
+#                 max_tokens=4096
+#             )
+#             content = response.content[0].text
+#             usage = response.usage
+#             output = {
+#                 "choices": [{"message": {"content": content, "role": "assistant"}}],
+#                 "usage": {
+#                     "completion_tokens": usage.output_tokens,
+#                     "prompt_tokens": usage.input_tokens,
+#                     "total_tokens": usage.input_tokens + usage.output_tokens
+#                 }
+#             }
+#             return output
+        
+#         @staticmethod
+#         def _convert_to_anthropic_format(message: list[dict[str, str]]):
+#             system_message = ""
+#             formatted_message = []
+#             for m in message:
+#                 if m["role"] == "system":
+#                     system_message += m["content"]
+#                 else:
+#                     formatted_message.append({
+#                         "role": m["role"],
+#                         "content": [{"type": "text", "text": m["content"]}]
+#                     })
+#             return system_message, formatted_message
+    
+#     model_with_chat_complete = Model()
+#     return model_with_chat_complete
 
 
 class BaseModel(ABC):
     """ Base model class """
     @abstractmethod
-    def chat_complete(self, message: list[dict[str, str]]) -> Response:
+    def chat_complete(self, message: list[dict[str, str]]) -> str:
         pass

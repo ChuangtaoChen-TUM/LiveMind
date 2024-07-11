@@ -2,24 +2,26 @@ import datasets
 import re
 import random
 import logging
+from .abc import BaseDataset
 
 __all__ = ['MMLUProDataset', 'MMLU_FORMAT_INST']
 
 MMLU_FORMAT_INST = "Your answer should end with 'The answer is (Choice)'."
-MMU_PRO_CATEGORIES = [
+MMLU_PRO_CATEGORIES = [
     'computer science', 'math', 'chemistry', 'engineering', 'law', 'biology',
     'health', 'physics', 'business', 'philosophy', 'economics', 'other',
     'psychology', 'history'
 ]
 
-class MMLUProDataset:
+class MMLUProDataset(BaseDataset):
     """ The MMLU-Pro dataset """
     def __init__(self, path):
         self.path = path
         self.dataset = datasets.load_dataset(path)
-        self.selected_questions = []
+        self._selected_questions = []
+        self._answer_format = MMLU_FORMAT_INST
 
-    def select_questions(
+    def select(
         self,
         num_per_category: dict|int,
         randomize:bool=False,
@@ -36,7 +38,7 @@ class MMLUProDataset:
         """
         if isinstance(num_per_category, int):
             num_per_category_dict = {}
-            for c in MMU_PRO_CATEGORIES:
+            for c in MMLU_PRO_CATEGORIES:
                 num_per_category_dict[c] = num_per_category
             num_per_category = num_per_category_dict
         dataset = self.dataset
@@ -47,7 +49,7 @@ class MMLUProDataset:
         if randomize:
             dataset = dataset.shuffle(seed=seed)
         for c in num_per_category.keys():
-            if c not in MMU_PRO_CATEGORIES:
+            if c not in MMLU_PRO_CATEGORIES:
                 raise ValueError(f"category {c} is not in the dataset")
             data_by_category = dataset.filter(lambda x: x['category'] == c)
             if num_per_category[c] == -1:
@@ -58,10 +60,25 @@ class MMLUProDataset:
             else:
                 questions.extend(data_by_category.to_list()[:num_per_category[c]])
 
-        self.selected_questions = questions
+        self._selected_questions = questions
+
+    def add_str(self, entry: dict) -> str:
+        return " "+self.form_options(entry['options'])
+
+    def verify_answer(self, response: str, answer_text: str):
+        prediction = self.get_prediction(response)
+        return prediction == answer_text
+
+    @property
+    def selected_questions(self):
+        return self._selected_questions
+
+    @property
+    def answer_format(self) -> str:
+        return self._answer_format
 
     @staticmethod
-    def form_options(options: list):
+    def form_options(options: list) -> str:
         """ Form the options string for the prompt """
         option_str = 'Options are:\n'
         opts = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
@@ -95,3 +112,4 @@ class MMLUProDataset:
                 if logger:
                     logger.warning(f"in output {output}, extraction failed")
                 return None
+

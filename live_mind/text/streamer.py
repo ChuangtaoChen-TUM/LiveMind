@@ -3,8 +3,8 @@ To use a text streamer, the texts to be streamed should be provided in advance.
 """
 __all__ = ["TextStreamer"]
 
-import logging
 from collections.abc import Callable
+from typing import Optional
 from .segmenter import nltk_sent_segmenter
 from .abc import BaseTextStreamer
 
@@ -13,7 +13,7 @@ class TextStreamer(BaseTextStreamer):
     
     `next`: generate next text and current time will be updated to the time when the text is generated.
     
-    `wait`: get text generated in a period of time. Current time will be updated based on `delay` time.
+    `wait`: get text generated in a period of time. Current time will be updated based on `delay`.
 
     """
     def __init__(
@@ -21,12 +21,14 @@ class TextStreamer(BaseTextStreamer):
         text: str,
         granularity: str,
         delay_fn: Callable[[str], float],
+        final_text: Optional[str] = None,
         config: dict = {}, # additional configuration for the generator
-        logger: logging.Logger|None = None
     ):
         assert granularity in ["char", "chunk", "token", "sentence"]
         self.delay_fn = delay_fn
         self.text = self.split(text, granularity, **config)
+        if final_text:
+            self.text.append(final_text)
         self.index = 0
         self.current_time = 0.0 # current time
         self.last_gen_time = 0.0 # when the last text was generated
@@ -95,4 +97,3 @@ class TextStreamer(BaseTextStreamer):
                 return nltk_sent_segmenter(text)
             case _:
                 raise ValueError(f"granularity {granularity} is not supported.")
-        return []
