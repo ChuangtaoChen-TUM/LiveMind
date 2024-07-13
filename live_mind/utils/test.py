@@ -29,3 +29,4 @@ class DummyLLM:
 
     def format_action(self, action: ActionType):
         return f"action {action.name}.\n"
+

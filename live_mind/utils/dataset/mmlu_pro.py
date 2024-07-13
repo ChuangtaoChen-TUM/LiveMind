@@ -23,7 +23,7 @@ class MMLUProDataset(BaseDataset):
 
     def select(
         self,
-        num_per_category: dict|int,
+        num: int,
         randomize:bool=False,
         seed:int=42,
         split:str='test'
@@ -36,11 +36,11 @@ class MMLUProDataset(BaseDataset):
         - `randomize`: `bool`, whether to shuffle the dataset
         - `seed`: `int`, random seed
         """
-        if isinstance(num_per_category, int):
-            num_per_category_dict = {}
-            for c in MMLU_PRO_CATEGORIES:
-                num_per_category_dict[c] = num_per_category
-            num_per_category = num_per_category_dict
+        if isinstance(num, int):
+            base_num = num // len(MMLU_PRO_CATEGORIES)
+            num_per_category = {c: base_num for c in MMLU_PRO_CATEGORIES}
+            for i in range(num % len(MMLU_PRO_CATEGORIES)):
+                num_per_category[MMLU_PRO_CATEGORIES[i]] += 1
         dataset = self.dataset
         assert split in dataset.keys(), f"split {split} is not in the dataset"
         dataset = dataset[split]

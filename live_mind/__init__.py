@@ -21,7 +21,7 @@ class LMController(BaseController):
         hypothesize: bool = False,
         retreive_all: bool = True,
         summarize_len: int = -1,
-        answer_format: str = "",
+        answer_format: str|None = None,
         logger: logging.Logger|None = None
     ):
         self.action_cache = SegmentActionCache()
@@ -77,6 +77,7 @@ class LMController(BaseController):
         actions, new_prompts = self.action_cache.read_action(prompts)
         msg = self.formatter.format_inference(actions, new_prompts)
         response = self.infer_model.chat_complete(msg)
+        # if the action is not parsed, write a wait as a placeholder to avoid frequent inference
         action = self._update(response, force_write=True)
         return action, response
 
@@ -84,7 +85,8 @@ class LMController(BaseController):
     def _output(self, prompts: list[str]):
         actions, new_prompts = self.action_cache.read_action(prompts)
         msg = self.formatter.format_output(actions, new_prompts)
-        msg[-1]['content'] += "\n\n"+self.answer_format
+        if self.answer_format:
+            msg[-1]['content'] += "\n\n"+self.answer_format
         response = self.output_model.chat_complete(msg)
         return response
 

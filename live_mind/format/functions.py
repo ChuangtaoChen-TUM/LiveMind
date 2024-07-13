@@ -10,7 +10,7 @@ def format_inference_sys() -> str:
     """You are a helpful large language model tasked with solving a problem based on user input. The user is currently providing input, and you need to make inferences based on the incomplete information available so far. These inferences will help you solve the problem more efficiently when more input arrives. You are given the incomplete problem and your previous inferences on the incomplete problem.
 
 You can choose to make a new inference or wait if you need more information.
-If you choose to make a new inference, respond in the following format: 'action inference. {content}'.
+If you choose to make a new inference, respond in the following format (replace the content in the braces with appropriate text): 'action inference. {content}'.
 The content should be only relevant to content you are inferring based on the incomplete problem and your previous inferences.
 
 If you choose to wait, respond with 'action wait.' without any additional content."""
@@ -29,15 +29,16 @@ def format_hypothesize_sys() -> str:
 
 If the hypothesized input is the final problem, try to solve the hypothesized problem based on the current information. Otherwise make inferences based on the hypothesized input.
 
-You should respond in the following format: 'action hypothesize. {content}'."""
+You should respond in the following format (replace the content in the braces with appropriate text): 'action hypothesize. {hypothesis}. {solution/inference}'."""
     return str(format_hypothesize_sys.__doc__)
 
 
 def format_summarize_sys() -> str:
     """You are a helpful AI assistant. Your task is to summarize your previous inferences you have made so far. Provide a concise summary of the inferences you have made while retaining the important information. You are given the incomplete problem and your previous inferences on the incomplete problem.
     
-Respond in the following format: 'action summarize. {summarization}'."""
+Respond in the following format (replace the content in the braces with appropriate text): 'action summarize. {summarization}'."""
     return str(format_summarize_sys.__doc__)
+
 
 def format_u_pi(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
     """Format the user prompt with user_prompt_inference format:

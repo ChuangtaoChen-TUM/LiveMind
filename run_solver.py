@@ -123,6 +123,8 @@ def main(
         with open(output_file, "w", encoding='utf-8') as file:
             json.dump(entry_list, file, indent=4)
 
+
+
 SEGMENTER_MAP: dict[str, Callable[[str], list[str]]] = {
     "sentence": nltk_sent_segmenter,
     "clause": nltk_comma_segamenter,
@@ -131,43 +133,46 @@ SEGMENTER_MAP: dict[str, Callable[[str], list[str]]] = {
 }
 
 FORMAT_MAP = {
-    "u_pi": LMFormat.U_PI,
-    "u_pli": LMFormat.U_PLI,
-    "u_pil": LMFormat.U_PIL,
-    "u_ip": LMFormat.U_IP,
-    "u_ipl": LMFormat.U_IPL,
-    "ua_pil": LMFormat.UA_PIL,
-    "u_spi": LMFormat.U_SPI,
-    "ua_spi": LMFormat.UA_SPI
+    "u-pi": LMFormat.U_PI,
+    "u-pli": LMFormat.U_PLI,
+    "u-pil": LMFormat.U_PIL,
+    "u-ip": LMFormat.U_IP,
+    "u-ipl": LMFormat.U_IPL,
+    "ua-pil": LMFormat.UA_PIL,
+    "u-spi": LMFormat.U_SPI,
+    "ua-spi": LMFormat.UA_SPI
 }
+
+DEFAULT_NUM_QUESTIONS = 1000
+DEFAULT_CHUNK_SIZE = 20
+DEFAULT_SUM_LEN = 5
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--infer_model", metavar="str", type=str, default=None, help="inference model: llama-3-8b, llama-3-70b")
-    parser.add_argument("--out_model", metavar="str", type=str, default=None, help="output model, use the inference model if not given")
-    parser.add_argument("--prompt_format", metavar="str", type=str, default=None, help=f"prompt format, can be {', '.join(FORMAT_MAP.keys())}")
-    parser.add_argument("--granularity", metavar="str", type=str, default=None, help=f"granularity of the text streamer, can be {', '.join(SEGMENTER_MAP.keys())}")
-    parser.add_argument("--use_hypo", action="store_true", default=False, help="use hypothesis generation in the LiveMind framework")
-    parser.add_argument("--use_sum", action="store_true", default=False, help="use summarization in the LiveMind framework")
-    parser.add_argument("--no_retrieve_all", action="store_true", default=False, help="only retrieve one next prompt instead of all available prompts at each step")
-    parser.add_argument("--no_lm", action="store_true", default=False, help="disable LiveMind framework, use baseline solver instead")
-    parser.add_argument("--output_file", metavar="str", type=str, default=None, help="output results to json file")
-    parser.add_argument("--num_questions", metavar="int", type=int, default=100, help="number of questions per category, default: 100")
-    parser.add_argument("--log", action="store_true", default=False, help="log the results")
-    parser.add_argument("--chunk_size", metavar="int", type=int, default=20, help="chunk size if using chunk granularity")
-    parser.add_argument("--sum_len", metavar="int", type=int, default=10, help="summarization length")
-    parser.add_argument("--dataset", metavar="str", type=str, default="mmlu_pro", help="dataset to run the solver on, can be mmlu_pro or gsm8k")
+    parser.add_argument("-i",  "--infer-model",   metavar="M",    type=str, default=None, help="inference model: llama-3-8b, llama-3-70b")
+    parser.add_argument("-o",  "--out-model",     metavar="M",    type=str, default=None, help="output model: llama-3-8b, llama-3-70b")
+    parser.add_argument("-pf", "--prompt-format", metavar="FMT",  type=str, default=None, help=f"prompt format, can be {', '.join(FORMAT_MAP.keys())}")
+    parser.add_argument("-g",  "--granularity",   metavar="G",    type=str, default=None, help=f"granularity of the text streamer, can be {', '.join(SEGMENTER_MAP.keys())}")
+    parser.add_argument("-d",  "--dataset",       metavar="D",    type=str, default=None, help="dataset to run the solver on, can be mmlu_pro or gsm8k")
+    parser.add_argument("-f",  "--output-file",   metavar="File", type=str, nargs="?", default=False, const=True, help="output results to a json file")
+    parser.add_argument("--no-hypo", action="store_false",  dest="hypo", default=True, help="disable hypothesize step after wait")
+    parser.add_argument("--no-sum",  action="store_false",  dest="sum",  default=True, help="disable summarization step")
+    parser.add_argument("--no-lm",   action="store_false",  dest="lm",   default=True, help="disable LiveMind framework, use baseline solver instead")
+    parser.add_argument("--log",     action="store_false",  dest="log",  default=True, help="log the results")
+    parser.add_argument("--no-retrieve_all", action="store_true", dest="retrieve_all", default=True, help="only retrieve one next prompt instead of all available prompts at each step")
+    parser.add_argument("-n", "--num-questions", metavar="N", type=int, default=DEFAULT_NUM_QUESTIONS, help=f"number of questions per category, default: {DEFAULT_NUM_QUESTIONS}")
+    parser.add_argument("--chunk-size",          metavar="N", type=int, default=DEFAULT_CHUNK_SIZE,    help=f"chunk size if using chunk granularity, default: {DEFAULT_CHUNK_SIZE}")
+    parser.add_argument("--sum-len",             metavar="N", type=int, default=DEFAULT_SUM_LEN,       help=f"summarization length, default: {DEFAULT_SUM_LEN}")
     args = parser.parse_args()
 
     assert args.num_questions == -1 or args.num_questions > 0
-    assert args.output_file is None or args.output_file.endswith(".json")
 
     logger: logging.Logger|None = None
     if args.log:
         # Configure logging
-        logger = logging.getLogger("mmlu_pro")
+        logger = logging.getLogger("lm_solver")
         logger.setLevel(logging.INFO)
-        file_handler = logging.FileHandler("./output/mmlu_pro/log.log")
+        file_handler = logging.FileHandler("./output/log.log")
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -180,8 +185,10 @@ if __name__ == "__main__":
         if not GSM8K_PATH:
             raise ValueError("Please set the path to the GSM8K dataset in config.py")
         dataset = GSM8kDataset(GSM8K_PATH)
+    else:
+        raise ValueError("Invalid dataset, please choose either 'mmlu_pro' or 'gsm8k'")
 
-    if args.no_lm:
+    if not args.lm: # baseline
         if args.out_model is None:
             raise ValueError("Please specify the output model")
         if args.infer_model is None:
@@ -190,27 +197,32 @@ if __name__ == "__main__":
             print("Warning: --no_lm is set, the prompt format will be ignored")
         if args.granularity is not None:
             print("Warning: --no_lm is set, the granularity will be ignored")
-        if args.chunk_size != 20:
+        if args.chunk_size != DEFAULT_CHUNK_SIZE:
             print("Warning: --no_lm is set, the chunk size will be ignored")
-        if args.use_hypo:
-            print("Warning: --no_lm is set, the hypothesis generation will be ignored")
-        if args.use_sum:
-            print("Warning: --no_lm is set, the summarization will be ignored")
-        if args.no_retrieve_all:
-            print("Warning: --no_lm is set, the not retrieve all option will be ignored")
+        if not args.hypo:
+            print("Warning: --no_lm is set, the hypothesis is already disabled")
+        if not args.sum:
+            print("Warning: --no_lm is set, the summarization is already disabled")
+        if not args.retrieve_all:
+            print("Warning: --no_lm is set, the retrieve_all is already disabled")
+        if args.sum_len != DEFAULT_SUM_LEN:
+            print("Warning: --no_lm is set, the summarization length will be ignored")
         output_model = get_model(args.out_model)
         if output_model is None:
             raise ValueError("Invalid output model")
         inference_model = output_model
-        controller: BaseController = CompleteCoTController(CoTFormatter(), output_model=output_model)
+        controller: BaseController = CompleteCoTController(
+            CoTFormatter(),
+            output_model=output_model
+        )
     else:
         if args.infer_model is None:
             raise ValueError("Please specify the inference model")
         if args.out_model is None:
             print("Warning: --out_model is not set, use the inference model as the output model")
-        if args.chunk_size != 20 and args.granularity != "chunk":
+        if args.chunk_size != DEFAULT_CHUNK_SIZE and args.granularity != "chunk":
             print("Warning: --chunk_size is set, but the granularity is not 'chunk', the chunk size will be ignored")
-        if not args.use_sum and args.sum_len != 10:
+        if not args.sum and args.sum_len != DEFAULT_SUM_LEN:
             print("Warning: --use_sum is not set, the summarization length will be ignored")
         inference_model = get_model(args.infer_model)
         if not inference_model:
@@ -219,6 +231,7 @@ if __name__ == "__main__":
             output_model = get_model(args.out_model)
         else:
             output_model = inference_model
+            args.out_model = args.infer_model
         if args.prompt_format is None:
             raise ValueError("Please specify the prompt format")
         if args.granularity is None:
@@ -226,7 +239,7 @@ if __name__ == "__main__":
         segmenter = SEGMENTER_MAP[args.granularity]
         format = FORMAT_MAP[args.prompt_format]
         formmatter = LMFormatter(format)
-        if args.use_sum:
+        if args.sum:
             sum_len = args.sum_len
         else:
             sum_len = -1
@@ -235,16 +248,31 @@ if __name__ == "__main__":
             formmatter,
             inference_model,
             output_model,
-            hypothesize=args.use_hypo,
+            hypothesize=args.hypo,
             summarize_len=sum_len,
-            retreive_all=not args.no_retrieve_all,
+            retreive_all=args.retrieve_all,
             answer_format=dataset.answer_format,
             logger=logger
         )
 
+    if isinstance(args.output_file, bool):
+        if args.output_file: # output file set but not given
+            if args.lm:
+                g_str = f"chunk-{args.chunk_size}" if args.granularity == "chunk" else args.granularity
+                sum_str = f"sum-{args.sum_len}" if args.sum else "no-sum"
+                hypo_str = "hypo" if args.hypo else "no-hypo"
+                ra_str = "ra" if args.retrieve_all else "no-ra"
+                num_q_str = f"{args.num_questions}q"
+                output_file: str|None = f"./output/{args.dataset}/lm_{args.infer_model}_{args.out_model}_{args.prompt_format}_{g_str}_{sum_str}_{hypo_str}_{ra_str}_{num_q_str}.json"
+                print(f"File name not specified, output to {output_file}")
+            else:
+                output_file = f"./output/{args.dataset}/baseline_{args.out_model}_{args.num_questions}q.json"
+        else:
+            output_file = None
+
+    assert output_file is None or output_file.endswith(".json")
     num_questions: int = args.num_questions
-    output_file: str|None = args.output_file
-    dataset.select(num_questions, randomize=True, seed=42, split='test') # choose 100 questions from each category
+    dataset.select(num_questions, randomize=True, seed=42, split='test')
     main(
         controller=controller,
         inference_model=inference_model,
