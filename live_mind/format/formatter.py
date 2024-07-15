@@ -1,4 +1,5 @@
-""" action formatters: format the system and user prompts based on the action configurations and the performed actions."""
+""" Formatters: Format prompts """
+
 __all__ = [
     'LMFormatter',
     'CoTFormatter',
@@ -7,17 +8,20 @@ __all__ = [
 import re
 from collections.abc import Iterable
 from .functions import (
+    LMFormat,
     format_inference_sys,
     format_output_sys,
     format_hypothesize_sys,
     format_summarize_sys,
-    FORMATTER_MAP
+    FORMATTER_MAP,
 )
-from .abc import BaseFormatter, LMFormat
+from .abc import BaseFormatter
 from ..action.abc import (
     Action,
-    ActionType
+    ActionType,
+    CacheEntry
 )
+
 
 class LMFormatter(BaseFormatter):
     """ Default action formatter for problem solving tasks with options
@@ -33,11 +37,11 @@ class LMFormatter(BaseFormatter):
 
     def format_inference(
         self,
-        history_actions: list[Action],
+        cache_entries: list[CacheEntry],
         new_prompts: list[str]
     ) -> list[dict[str, str]]:
         sys_msg = format_inference_sys()
-        user_msg: list[dict[str, str]] = self.formatter_fn(history_actions, new_prompts)
+        user_msg: list[dict[str, str]] = self.formatter_fn(cache_entries, new_prompts)
         msg = [
             {"role": "system", "content": sys_msg},
             *user_msg
@@ -47,11 +51,11 @@ class LMFormatter(BaseFormatter):
 
     def format_output(
         self,
-        history_actions: list[Action],
+        cache_entries: list[CacheEntry],
         new_prompts: list[str]
     ) -> list[dict[str, str]]:
         sys_msg = format_output_sys()
-        user_msg = self.formatter_fn(history_actions, new_prompts)
+        user_msg = self.formatter_fn(cache_entries, new_prompts)
         msg = [
             {"role": "system", "content": sys_msg},
             *user_msg
@@ -61,12 +65,11 @@ class LMFormatter(BaseFormatter):
 
     def format_hypothesize(
         self,
-        history_actions: list[Action],
+        cache_entries: list[CacheEntry],
         new_prompts: list[str]
     ) -> list[dict[str, str]]:
-        # TODO: Fix ua_spi format
         sys_msg = format_hypothesize_sys()
-        user_msg = self.formatter_fn(history_actions, new_prompts)
+        user_msg = self.formatter_fn(cache_entries, new_prompts)
         msg = [
             {"role": "system", "content": sys_msg},
             *user_msg
@@ -74,14 +77,15 @@ class LMFormatter(BaseFormatter):
         return msg
 
 
-    def format_summarize(self, history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+    def format_summarize(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
         sys_msg = format_summarize_sys()
-        user_msg = self.formatter_fn(history_actions, new_prompts) # use the same format as hypothesize
+        user_msg = self.formatter_fn(cache_entries, new_prompts) # use the same format as hypothesize
         msg = [
             {"role": "system", "content": sys_msg},
             *user_msg
         ]
         return msg
+
 
     def parse_action(self, response: str, action_types: Iterable[ActionType]) -> Action|None:
         """ Parse the user response to get the action. Return None if parsing fails.
@@ -101,42 +105,55 @@ class LMFormatter(BaseFormatter):
 
 
 class CoTFormatter(BaseFormatter):
+    def __init__(self, use_cot: bool=False):
+        self.use_cot = use_cot
+
+
     """ The CompleteCoTFormatter is a formatter for the CompleteCoTController with CoT system prompt """
-    def format_output(self, history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
-        sys_msg = self._format_output_sys()
-        user_msg = self._format_output_user(history_actions, new_prompts)
+    def format_output(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
+        if self.use_cot:
+            sys_msg = self._format_output_sys_cot()
+        else:
+            sys_msg = self._format_output_sys()
+        user_msg = self._format_output_user(cache_entries, new_prompts)
         msg = [
             {"role": "system", "content": sys_msg},
             {"role": "user", "content": user_msg}
         ]
         return msg
 
+
     def _format_output_sys(self) -> str:
-        """ Format the system prompt for final msg:
-
-            You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step.
-        """
-        return "You are a helpful AI assistant, and your tasks is to understand and solve a problem."
+        """You are a helpful AI assistant, and your tasks is to understand and solve a problem."""
+        return str(self._format_output_sys.__doc__)
 
 
-    def _format_output_user(self, actions: list[Action], new_prompts: list[str]) -> str:
+    def _format_output_sys_cot(self) -> str:
+        """You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."""
+        return str(self._format_output_sys_cot.__doc__)
+
+
+    def _format_output_user(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> str:
         """ Format the user prompt based on the actions and the new prompts:
 
             {old_prompt} {new_prompt}
         """
-        old_prompts = [prompt for action in actions for prompt in action.prompts]
+        old_prompts = [prompt for entry in cache_entries for prompt in entry.prompts]
         return "".join(old_prompts + new_prompts)
 
 
-    def format_inference(self, history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
-        raise NotImplementedError
-    
-    def format_hypothesize(self, history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
-        raise NotImplementedError
-    
-    def format_summarize(self, history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+    # The baseline controller does not use the following methods
+    def format_inference(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
         raise NotImplementedError
 
+
+    def format_hypothesize(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
+        raise NotImplementedError
+
+
+    def format_summarize(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
+        raise NotImplementedError
+
+
     def parse_action(self, response: str, action_types: Iterable[ActionType]) -> Action|None:
-        """ Not implemented """
         raise NotImplementedError

@@ -7,8 +7,7 @@ import time
 from tqdm import tqdm
 from typing import Callable
 from live_mind import LMController, CompleteCoTController, BaseController
-from live_mind.format.formatter import LMFormatter, CoTFormatter
-from live_mind.format import LMFormat
+from live_mind.format.formatter import LMFormatter, CoTFormatter, LMFormat
 from live_mind.text import (
     TextStreamer,
     nltk_sent_segmenter,
@@ -118,7 +117,9 @@ def main(
         # verify the answer
         tqdm_bar.set_description(f"Accuracy: {num_correct/num_total:.2f}")
     
+    print(f"Accuracy: {num_correct/num_total:.2f}")
     if output_file:
+        print(f"Writing results to {output_file}")
         pathlib.Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding='utf-8') as file:
             json.dump(entry_list, file, indent=4)
@@ -158,6 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-hypo", action="store_false",  dest="hypo", default=True, help="disable hypothesize step after wait")
     parser.add_argument("--no-sum",  action="store_false",  dest="sum",  default=True, help="disable summarization step")
     parser.add_argument("--no-lm",   action="store_false",  dest="lm",   default=True, help="disable LiveMind framework, use baseline solver instead")
+    parser.add_argument("--no-cot",  action="store_false",  dest="cot",  default=True, help="disable chain-of-thoughts when using baseline solver")
     parser.add_argument("--log",     action="store_false",  dest="log",  default=True, help="log the results")
     parser.add_argument("--no-retrieve_all", action="store_true", dest="retrieve_all", default=True, help="only retrieve one next prompt instead of all available prompts at each step")
     parser.add_argument("-n", "--num-questions", metavar="N", type=int, default=DEFAULT_NUM_QUESTIONS, help=f"number of questions per category, default: {DEFAULT_NUM_QUESTIONS}")
@@ -192,38 +194,40 @@ if __name__ == "__main__":
         if args.out_model is None:
             raise ValueError("Please specify the output model")
         if args.infer_model is None:
-            print("Warning: --no_lm is set, the inference model will be ignored")
+            print("Warning: --no-lm is set, the inference model will be ignored")
         if args.prompt_format is not None:
-            print("Warning: --no_lm is set, the prompt format will be ignored")
+            print("Warning: --no-lm is set, the prompt format will be ignored")
         if args.granularity is not None:
-            print("Warning: --no_lm is set, the granularity will be ignored")
+            print("Warning: --no-lm is set, the granularity will be ignored")
         if args.chunk_size != DEFAULT_CHUNK_SIZE:
-            print("Warning: --no_lm is set, the chunk size will be ignored")
+            print("Warning: --no-lm is set, the chunk size will be ignored")
         if not args.hypo:
-            print("Warning: --no_lm is set, the hypothesis is already disabled")
+            print("Warning: --no-lm is set, the hypothesis is already disabled")
         if not args.sum:
-            print("Warning: --no_lm is set, the summarization is already disabled")
+            print("Warning: --no-lm is set, the summarization is already disabled")
         if not args.retrieve_all:
-            print("Warning: --no_lm is set, the retrieve_all is already disabled")
+            print("Warning: --no-lm is set, the retrieve-all is already disabled")
         if args.sum_len != DEFAULT_SUM_LEN:
-            print("Warning: --no_lm is set, the summarization length will be ignored")
+            print("Warning: --no-lm is set, the summarization length will be ignored")
         output_model = get_model(args.out_model)
         if output_model is None:
             raise ValueError("Invalid output model")
         inference_model = output_model
         controller: BaseController = CompleteCoTController(
-            CoTFormatter(),
+            CoTFormatter(args.cot),
             output_model=output_model
         )
     else:
         if args.infer_model is None:
             raise ValueError("Please specify the inference model")
         if args.out_model is None:
-            print("Warning: --out_model is not set, use the inference model as the output model")
+            print("Warning: --out-model is not set, use the inference model as the output model")
         if args.chunk_size != DEFAULT_CHUNK_SIZE and args.granularity != "chunk":
-            print("Warning: --chunk_size is set, but the granularity is not 'chunk', the chunk size will be ignored")
+            print("Warning: --chunk-size is set, but the granularity is not 'chunk', the chunk size will be ignored")
         if not args.sum and args.sum_len != DEFAULT_SUM_LEN:
-            print("Warning: --use_sum is not set, the summarization length will be ignored")
+            print("Warning: --use-sum is not set, the summarization length will be ignored")
+        if not args.cot:
+            print("Warning: --no-cot is set, when using LiveMind framework, the chain-of-thoughts setting will be ignored")
         inference_model = get_model(args.infer_model)
         if not inference_model:
             raise ValueError("Invalid inference model")

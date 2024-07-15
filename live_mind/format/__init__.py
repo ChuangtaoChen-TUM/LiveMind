@@ -1,3 +1,5 @@
+""" This module contains the tools for prompt formatting """
+
 __all__ = [
     'abc',
     'functions',

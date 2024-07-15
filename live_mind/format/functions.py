@@ -1,10 +1,24 @@
+""" Formats and templates for LMFormatter """
 __all__  = [
     "FORMATTER_MAP",
+    "LMFormat",
 ]
 
-from .abc import LMFormat
-from ..action import Action
+from enum import Enum
+from ..action.abc import CacheEntry
 from ..action.actions import Wait
+
+class LMFormat(Enum):
+    """ Format Enum for the LMFormatter """
+    U_PI = "user_prompt_inference"
+    U_PLI = "user_prompt_last_prompt_inference"
+    U_PIL = "user_prompt_inference_last_prompt"
+    U_IP = "user_inference_prompt"
+    U_IPL = "user_inference_prompt_last_prompt"
+    U_SPI = "user_sequence_prompt_inference"
+    UA_PIL = "user_assistant_prompt_inference_last_prompt"
+    UA_SPI = "user_assistant_sequence_prompt_inference"
+
 
 def format_inference_sys() -> str:
     """You are a helpful large language model tasked with solving a problem based on user input. The user is currently providing input, and you need to make inferences based on the incomplete information available so far. These inferences will help you solve the problem more efficiently when more input arrives. You are given the incomplete problem and your previous inferences on the incomplete problem.
@@ -40,13 +54,13 @@ Respond in the following format (replace the content in the braces with appropri
     return str(format_summarize_sys.__doc__)
 
 
-def format_u_pi(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+def format_u_pi(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
     """Format the user prompt with user_prompt_inference format:
     User:
         Incomplete prompt: ...
         Previous inferences: (1) ... (2) ...
     """
-    old_prompts = [prompt for action in history_actions for prompt in action.prompts]
+    old_prompts = [prompt for entry in cache_entries for prompt in entry.prompts]
     prompts = old_prompts + new_prompts
     msg = []
     if prompts:
@@ -55,8 +69,9 @@ def format_u_pi(history_actions: list[Action], new_prompts: list[str]) -> list[d
 
     infer_msgs = []
     index = 1
-    for action in history_actions:
-        if action.type != Wait and action.formatted_content:
+    old_actions = [action for entry in cache_entries for action in entry.actions]
+    for action in old_actions:
+        if action.formatted_content:
             infer_msgs.append(f"({index}) {action.formatted_content}")
             index += 1
     if infer_msgs:
@@ -72,103 +87,19 @@ def format_u_pi(history_actions: list[Action], new_prompts: list[str]) -> list[d
     return [msg_dict]
 
 
-def format_u_pli(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
-    """ Format the user prompt with user_prompt_last_prompt_inference format:
-    User:
-        Previous prompt: ...
-        New prompt: ...
-        Previous inferences: (1) ... (2) ...
-    """
-    # regard last prompts with 'wait' actions as new prompts
-    i = len(history_actions) - 1
-    while i >= 0 and history_actions[i].type == Wait:
-        i -= 1
-    old_prompts = [prompt for action in history_actions[:i+1] for prompt in action.prompts]
-    wait_prompts = [prompt for action in history_actions[i+1:] for prompt in action.prompts]
-    new_prompts = wait_prompts + new_prompts
-
-    msg = []
-    if old_prompts:
-        msg.append("Previous prompt: ")
-        msg.extend(old_prompts)
-    infer_msgs = []
-    index = 1
-    for action in history_actions:
-        if action.type != Wait and action.formatted_content:
-            infer_msgs.append(f"({index}) {action.formatted_content}")
-            index += 1
-    if new_prompts:
-        if msg:
-            msg.append("\n")
-        msg.append("New prompt: ")
-        msg.extend(new_prompts)
-    if infer_msgs:
-        if msg:
-            msg.append("\n")
-        msg.append("Previous inferences: ")
-        msg.extend(" ".join(infer_msgs))
-
-    msg_dict = {
-        "role" : "user",
-        "content" : "".join(msg)
-    }
-    return [msg_dict]
-
-def format_u_pil(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
-    """ Format the user prompt with user_prompt_inference_last_prompt format:
-    User:
-        Previous prompt: ...
-        Previous inferences: (1) ... (2) ...
-        New prompt: ...
-    """
-    # regard last prompts with 'wait' actions as new prompts
-    i = len(history_actions) - 1
-    while i >= 0 and history_actions[i].type == Wait:
-        i -= 1
-    old_prompts = [prompt for action in history_actions[:i+1] for prompt in action.prompts]
-    wait_prompts = [prompt for action in history_actions[i+1:] for prompt in action.prompts]
-    new_prompts = wait_prompts + new_prompts
-
-    msg = []
-    if old_prompts:
-        msg.append("Previous prompt: ")
-        msg.extend(old_prompts)
-    infer_msgs = []
-    index = 1
-    for action in history_actions:
-        if action.type != Wait and action.formatted_content:
-            infer_msgs.append(f"({index}) {action.formatted_content}")
-            index += 1
-    if infer_msgs:
-        if msg:
-            msg.append("\n")
-        msg.append("Previous inferences: ")
-        msg.extend(" ".join(infer_msgs))
-    if new_prompts:
-        if msg:
-            msg.append("\n")
-        msg.append("New prompt: ")
-        msg.extend(new_prompts)
-
-    msg_dict = {
-        "role" : "user",
-        "content" : "".join(msg)
-    }
-    return [msg_dict]
-
-
-def format_u_ip(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+def format_u_ip(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
     """ Format the user prompt with user_inference_prompt format:
     User:
         Previous inferences: (1) ... (2) ...
         Incomplete prompt: ...
     """
-    old_prompts = [prompt for action in history_actions for prompt in action.prompts]
+    old_prompts = [prompt for entry in cache_entries for prompt in entry.prompts]
+    old_actions = [action for entry in cache_entries for action in entry.actions]
     msg = []
     infer_msgs = []
     index = 1
-    for action in history_actions:
-        if action.type != Wait and action.formatted_content:
+    for action in old_actions:
+        if action.formatted_content:
             infer_msgs.append(f"({index}) {action.formatted_content}")
             index += 1
     if infer_msgs:
@@ -180,14 +111,107 @@ def format_u_ip(history_actions: list[Action], new_prompts: list[str]) -> list[d
         msg.append("Incomplete prompt: ")
         msg.extend(old_prompts)
     msg.extend(new_prompts)
-    
+
     msg_dict = {
         "role" : "user",
         "content" : "".join(msg)
     }
     return [msg_dict]
 
-def format_u_ipl(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+
+def format_u_pli(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
+    """ Format the user prompt with user_prompt_last_prompt_inference format:
+    User:
+        Previous prompt: ...
+        New prompt: ...
+        Previous inferences: (1) ... (2) ...
+    """
+    i = len(cache_entries) - 1
+    while i >= 0:
+        if len(cache_entries[i].actions) == 1 and cache_entries[i].actions[0].type == Wait:
+            i -= 1
+        else:
+            break
+
+    old_prompts = [prompt for entry in cache_entries[:i+1] for prompt in entry.prompts]
+    new_prompts = [prompt for entry in cache_entries[i+1:] for prompt in entry.prompts] + new_prompts
+    old_actions = [action for entry in cache_entries for action in entry.actions]
+    msg = []
+    if old_prompts:
+        msg.append("Previous prompt: ")
+        msg.extend(old_prompts)
+    infer_msgs = []
+    index = 1
+    for action in old_actions:
+        if action.formatted_content:
+            infer_msgs.append(f"({index}) {action.formatted_content}")
+            index += 1
+    if new_prompts:
+        if msg:
+            msg.append("\n")
+        msg.append("New prompt: ")
+        msg.extend(new_prompts)
+    if infer_msgs:
+        if msg:
+            msg.append("\n")
+        msg.append("Previous inferences: ")
+        msg.extend(" ".join(infer_msgs))
+
+    msg_dict = {
+        "role" : "user",
+        "content" : "".join(msg)
+    }
+    return [msg_dict]
+
+
+def format_u_pil(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
+    """ Format the user prompt with user_prompt_inference_last_prompt format:
+    User:
+        Previous prompt: ...
+        Previous inferences: (1) ... (2) ...
+        New prompt: ...
+    """
+    # regard last prompts with 'wait' actions as new prompts
+    i = len(cache_entries) - 1
+    while i >= 0:
+        if len(cache_entries[i].actions) == 1 and cache_entries[i].actions[0].type == Wait:
+            i -= 1
+        else:
+            break
+
+    old_prompts = [prompt for entry in cache_entries[:i+1] for prompt in entry.prompts]
+    new_prompts = [prompt for entry in cache_entries[i+1:] for prompt in entry.prompts] + new_prompts
+    old_actions = [action for entry in cache_entries for action in entry.actions]
+
+    msg = []
+    if old_prompts:
+        msg.append("Previous prompt: ")
+        msg.extend(old_prompts)
+    infer_msgs = []
+    index = 1
+    for action in old_actions:
+        if action.formatted_content:
+            infer_msgs.append(f"({index}) {action.formatted_content}")
+            index += 1
+    if infer_msgs:
+        if msg:
+            msg.append("\n")
+        msg.append("Previous inferences: ")
+        msg.extend(" ".join(infer_msgs))
+    if new_prompts:
+        if msg:
+            msg.append("\n")
+        msg.append("New prompt: ")
+        msg.extend(new_prompts)
+
+    msg_dict = {
+        "role" : "user",
+        "content" : "".join(msg)
+    }
+    return [msg_dict]
+
+
+def format_u_ipl(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
     """ Format the user prompt with user_inference_prompt_last_prompt format:
     User:
         Previous inferences: (1) ... (2) ...
@@ -195,18 +219,23 @@ def format_u_ipl(history_actions: list[Action], new_prompts: list[str]) -> list[
         New prompt: ...
     """
     # regard last prompts with 'wait' actions as new prompts
-    i = len(history_actions) - 1
-    while i >= 0 and history_actions[i].type == Wait:
-        i -= 1
-    old_prompts = [prompt for action in history_actions[:i+1] for prompt in action.prompts]
-    wait_prompts = [prompt for action in history_actions[i+1:] for prompt in action.prompts]
-    new_prompts = wait_prompts + new_prompts
+    i = len(cache_entries) - 1
+    while i >= 0:
+        if len(cache_entries[i].actions) == 1 and cache_entries[i].actions[0].type == Wait:
+            i -= 1
+        else:
+            break
+
+    old_prompts = [prompt for entry in cache_entries[:i+1] for prompt in entry.prompts]
+    new_prompts = [prompt for entry in cache_entries[i+1:] for prompt in entry.prompts] + new_prompts
+    old_actions = [action for entry in cache_entries for action in entry.actions]
+
 
     msg = []
     infer_msgs = []
     index = 1
-    for action in history_actions:
-        if action.type != Wait and action.formatted_content:
+    for action in old_actions:
+        if action.formatted_content:
             infer_msgs.append(f"({index}) {action.formatted_content}")
             index += 1
     if infer_msgs:
@@ -229,52 +258,24 @@ def format_u_ipl(history_actions: list[Action], new_prompts: list[str]) -> list[
     }
     return [msg_dict]
 
-def format_u_spi(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+
+def format_u_spi(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
     """ Format the user prompt with user_sequence_prompt_inference format:
     User: prompt: prompt 1 inference: inference 1 ... prompt: last_prompt
     """
     temp_prompts: list[str] = []
-    temp_infer_msgs: list[str] = []
     msgs: list[str] = []
-    for action in history_actions:
-        has_prompts = bool(action.prompts)
-        not_wait = action.type != Wait
 
-        # (has_prompts and not_wait) can be `True, True` (inference)`, 
-        # `True, False` (wait), `False, True` (hypothesize, summarize)
-        # it can never be `False, False` (invalid action)
-        assert has_prompts or not_wait
-
-        if has_prompts and temp_infer_msgs:
-            # if current action is inference or wait, flush previous actions
+    for entry in cache_entries:
+        prompts = entry.prompts
+        infer_msg = " ".join(action.formatted_content for action in entry.actions if action.formatted_content)
+        temp_prompts.extend(prompts)
+        if infer_msg:
             if msgs:
                 msgs.append("\n")
-            msgs.append("Inference: ")
-            msgs.append(" ".join(temp_infer_msgs))
-            temp_infer_msgs = []
-
-        # save current action prompts
-        temp_prompts.extend(action.prompts)
-
-        # if current action is not wait, flush the prompts
-        if not_wait:
-            if msgs:
-                msgs.append("\n")
-            msgs.append("Prompt: ")
-            msgs.append("".join(temp_prompts))
+            msgs.append(f"Prompt: {''.join(temp_prompts)}")
+            msgs.append(f"Inference: {infer_msg}")
             temp_prompts = []
-
-        # save current action content
-        if action.formatted_content:
-            temp_infer_msgs.append(action.formatted_content)
-
-
-    # flush the last action
-    if temp_infer_msgs:
-        if msgs:
-            msgs.append("\n")
-        msgs.append("Inference: ")
-        msgs.append(" ".join(temp_infer_msgs))
 
     new_prompts = temp_prompts + new_prompts
     assert new_prompts
@@ -289,27 +290,30 @@ def format_u_spi(history_actions: list[Action], new_prompts: list[str]) -> list[
     return [msg_dict]
 
 
-def format_ua_pil(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+def format_ua_pil(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
     """ Format the user prompt with user_assistant_prompt_inference_last_prompt format:
     User: previous prompt
     Assistant: previous inference
     User: new prompt
     """
     # regard last prompts with 'wait' actions as new prompts
-    i = len(history_actions) - 1
-    while i >= 0 and history_actions[i].type == Wait:
-        i -= 1
-    old_prompts = [prompt for action in history_actions[:i+1] for prompt in action.prompts]
-    wait_prompts = [prompt for action in history_actions[i+1:] for prompt in action.prompts]
-    new_prompts = wait_prompts + new_prompts
+    i = len(cache_entries) - 1
+    while i >= 0:
+        if len(cache_entries[i].actions) == 1 and cache_entries[i].actions[0].type == Wait:
+            i -= 1
+        else:
+            break
+
+    old_prompts = [prompt for entry in cache_entries[:i+1] for prompt in entry.prompts]
+    new_prompts = [prompt for entry in cache_entries[i+1:] for prompt in entry.prompts] + new_prompts
+    old_actions = [action for entry in cache_entries for action in entry.actions]
 
     msg = []
     infer_msgs = []
-    for action in history_actions:
-        if action.type != Wait and action.formatted_content:
+    for action in old_actions:
+        if action.formatted_content:
             infer_msgs.append(action.formatted_content)
 
-    
     has_old = bool(old_prompts)
     has_infer = bool(infer_msgs)
     has_new = bool(new_prompts)
@@ -346,7 +350,7 @@ def format_ua_pil(history_actions: list[Action], new_prompts: list[str]) -> list
     return msg
 
 
-def format_ua_spi(history_actions: list[Action], new_prompts: list[str]) -> list[dict[str, str]]:
+def format_ua_spi(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
     """Format the user prompt with user_assistant_sequence_prompt_inference format:
     User: prompt 1
     Assistant: inference 1
@@ -359,50 +363,26 @@ def format_ua_spi(history_actions: list[Action], new_prompts: list[str]) -> list
     If the action has no prompts (e.g. hypothesis, summarize), they are merged to the previous action.
     """
     temp_prompts: list[str] = []
-    temp_infer_msgs: list[str] = []
     msg_dict: list[dict] = []
-    for action in history_actions:
-        has_prompts = bool(action.prompts)
-        not_wait = action.type != Wait
 
-        # (has_prompts and not_wait) can be `True, True` (inference)`, 
-        # `True, False` (wait), `False, True` (hypothesize, summarize)
-        # it can never be `False, False` (invalid action)
-        assert has_prompts or not_wait
-
-        if has_prompts and temp_infer_msgs:
-            # if current action is inference or wait, flush previous actions
-            assistant_msg = {
-                "role" : "assistant",
-                "content" : "action inference. " + " ".join(temp_infer_msgs)
-            }
-            msg_dict.append(assistant_msg)
-            temp_infer_msgs = []
-
-        # save current action prompts
-        temp_prompts.extend(action.prompts)
-
-        # if current action is not wait, flush the prompts
-        if not_wait:
+    for entry in cache_entries:
+        prompts = entry.prompts
+        infer_msg = " ".join(action.formatted_content for action in entry.actions if action.formatted_content)
+        temp_prompts.extend(prompts)
+        if infer_msg:
             user_msg = {
                 "role" : "user",
                 "content" : "".join(temp_prompts)
             }
             msg_dict.append(user_msg)
             temp_prompts = []
-        
-        # save current action content
-        if action.formatted_content:
-            temp_infer_msgs.append(action.formatted_content)
 
-
-    # flush the last action
-    if temp_infer_msgs:
-        assistant_msg = {
-            "role" : "assistant",
-            "content" : "action inference. " + " ".join(temp_infer_msgs)
-        }
-        msg_dict.append(assistant_msg)
+            assistant_msg = {
+                "role" : "assistant",
+                "content" : infer_msg
+            }
+            msg_dict.append(assistant_msg)
+            temp_prompts = []
 
     new_prompts = temp_prompts + new_prompts
     assert new_prompts
