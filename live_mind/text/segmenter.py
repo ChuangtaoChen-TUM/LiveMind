@@ -3,7 +3,7 @@ __all__ = [
     "char_segmenter",
     "chunk_segmenter",
     "nltk_sent_segmenter",
-    "nltk_comma_segamenter"
+    "nltk_comma_segmenter"
 ]
 
 from nltk.tokenize import sent_tokenize
@@ -30,7 +30,7 @@ def get_segmenter(name: str, **kwargs) -> Callable[[str], list[str]]:
         case "clause":
             min_len = kwargs.get("min_len", 10)
             def segmenter(text: str) -> list[str]:
-                return nltk_comma_segamenter(text, min_len)
+                return nltk_comma_segmenter(text, min_len)
             return segmenter
         case _:
             raise ValueError(f"Unknown segmenter name: {name}")
@@ -46,9 +46,14 @@ def chunk_segmenter(text: str, chunk_size: int=10) -> list[str]:
 
 def nltk_sent_segmenter(text: str, min_len: int=10) -> list[str]:
     sents = sent_tokenize(text)
+    
+    if not sents:
+        return []
+
     # Add a space to the start of each sentence, except the first one
     # merge short sentences into one
     merged_sents = []
+
     temp_sent = ""
     num_merged_sent = 0
     for sent in sents[:-1]:
@@ -70,7 +75,7 @@ def nltk_sent_segmenter(text: str, min_len: int=10) -> list[str]:
     return merged_sents
 
 
-def nltk_comma_segamenter(text: str, min_len: int=10) -> list[str]:
+def nltk_comma_segmenter(text: str, min_len: int=10) -> list[str]:
     sents: list[str] = nltk_sent_segmenter(text, min_len=min_len)
     # Add a comma and a space to the end of each sentence, except the last one
     segs = []
@@ -81,13 +86,34 @@ def nltk_comma_segamenter(text: str, min_len: int=10) -> list[str]:
 
 def _split_by_commas(text: str, min_len:int=10) -> list[str]:
     clauses = text.split(",")
+    last_is_comma = False
+    if len(clauses) > 0 and clauses[-1] == "":
+        last_is_comma = True
+        clauses = clauses[:-1]
+
     merged_clauses = []
     temp_clause = ""
-    for clause in clauses[:-1]:
-        temp_clause += clause + ","
-        if len(temp_clause) >= min_len:
+
+    for index in range(len(clauses)-1):
+        temp_clause += clauses[index] + ","
+        if len(temp_clause) >= min_len and not _check_num_chars(clauses[index], clauses[index+1]):
+            # if reached the min length and no consecutive digits
             merged_clauses.append(temp_clause)
             temp_clause = ""
+
     last_clause = temp_clause + clauses[-1]
+    if last_is_comma:
+        last_clause += ","
+
     merged_clauses.append(last_clause)
     return merged_clauses
+
+def _check_num_chars(text_1: str, text_2: str) -> bool:
+    """ Check if the last character of `text_1` and the first character of `text_2` are both digits """
+    text_1 = text_1.strip()
+    text_2 = text_2.strip()
+
+    if not text_1 or not text_2:
+        return False
+    
+    return text_1[-1].isdigit() and text_2[0].isdigit()

@@ -55,6 +55,7 @@ class SegmentActionCache():
         self.saved_prompts = []
         self.saved_index = -1
 
+
     def reset_action(self, actions: list[Action]):
         """ Reset the cache with the given actions (prompts are saved) """
         cached_prompts = [prompt for entry in self.cached_entries for prompt in entry.prompts]

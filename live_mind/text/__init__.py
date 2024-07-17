@@ -4,7 +4,7 @@ __all__ = [
     'segmenter',
     'TextStreamer',
     'nltk_sent_segmenter',
-    'nltk_comma_segamenter',
+    'nltk_comma_segmenter',
     'chunk_segmenter',
     'char_segmenter',
     'get_segmenter'
@@ -12,4 +12,4 @@ __all__ = [
 
 from . import streamer, segmenter
 from .streamer import TextStreamer
-from .segmenter import nltk_sent_segmenter, nltk_comma_segamenter, chunk_segmenter, char_segmenter, get_segmenter
+from .segmenter import nltk_sent_segmenter, nltk_comma_segmenter, chunk_segmenter, char_segmenter, get_segmenter
