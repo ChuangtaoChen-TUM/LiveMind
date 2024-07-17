@@ -14,7 +14,7 @@ class SegmentActionCache():
     def __init__(
         self,
     ):
-        self.cached_actions: list[CacheEntry] = []
+        self.cached_entries: list[CacheEntry] = []
         self.saved_prompts: list[str] = []
         self.saved_index = -1
 
@@ -29,7 +29,7 @@ class SegmentActionCache():
             return [], []
 
         e_index, p_index = self._get_index(prompts)
-        retrieved_entries = self.cached_actions[:e_index]
+        retrieved_entries = self.cached_entries[:e_index]
         new_prompts = prompts[p_index:]
         # Record the index of the retrieved entries and new prompts
         self.saved_prompts = new_prompts
@@ -51,23 +51,29 @@ class SegmentActionCache():
 
     def clear_cache(self):
         """ Clear the cache """
-        self.cached_actions = []
+        self.cached_entries = []
         self.saved_prompts = []
         self.saved_index = -1
+
+    def reset_action(self, actions: list[Action]):
+        """ Reset the cache with the given actions (prompts are saved) """
+        cached_prompts = [prompt for entry in self.cached_entries for prompt in entry.prompts]
+        self.clear_cache()
+        self.cached_entries = [CacheEntry(actions, cached_prompts),]
 
 
     def _write_action(self, new_entry: CacheEntry, e_index: int):
         """ Write a new entry with the action index to the cache """
-        if e_index < 0 or e_index > len(self.cached_actions):
+        if e_index < 0 or e_index > len(self.cached_entries):
             raise ValueError("Invalid index to write action")
         # update the action
-        if e_index == len(self.cached_actions):
+        if e_index == len(self.cached_entries):
             # append the new entry
-            self.cached_actions.append(new_entry)
-        elif self.cached_actions[e_index] != new_entry:
+            self.cached_entries.append(new_entry)
+        elif self.cached_entries[e_index] != new_entry:
             # update the entry
-            self.cached_actions[e_index] = new_entry
-            self.cached_actions = self.cached_actions[: e_index + 1]
+            self.cached_entries[e_index] = new_entry
+            self.cached_entries = self.cached_entries[: e_index + 1]
 
 
     def _get_index(self, prompts: list[str]) -> tuple[int, int]:
@@ -83,7 +89,7 @@ class SegmentActionCache():
         p_index = 0
         e_index = 0
         # Retrieve cached actions
-        for action in self.cached_actions:
+        for action in self.cached_entries:
             prompts_of_action = action.prompts
             if prompt_len - p_index < len(prompts_of_action):
                 # The prompts of the action is longer than the remaining prompts

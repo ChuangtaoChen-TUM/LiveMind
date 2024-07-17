@@ -58,7 +58,7 @@ class LMController(BaseController):
         if not new_prompts:
             return
         if self.retreive_all:
-            yield from self._step(cache_entries, prompts, stream_end)
+            yield from self._step(cache_entries, new_prompts, stream_end)
         else:
             start_index = len(prompts) - len(new_prompts)
             for i in range(len(new_prompts) - 1):
@@ -88,6 +88,8 @@ class LMController(BaseController):
                     actions.append(action)
                 yield response
 
+            self.action_cache.write_action(actions)
+
             if self.summarize_len > 0:
                 new_entry = CacheEntry(actions=actions, prompts=new_prompts)
                 new_entries = cache_entries + [new_entry] # add generated actions in this step for summarization
@@ -96,13 +98,13 @@ class LMController(BaseController):
                     for action in cache_entry.actions if action.type != Wait]
                 )
                 if num_non_wait >= self.summarize_len:
-                    action, summarization = self._summarize(new_entries, [])
-                    if action:
-                        actions.append(action)
+                    sum_action, summarization = self._summarize(new_entries, [])
+                    if sum_action:
+                        actions.append(sum_action)
                     if summarization:
+                        if sum_action:
+                            self.action_cache.reset_action([sum_action, ])
                         yield summarization
-
-            self.action_cache.write_action(actions)
 
 
     def _inference(self, cache_entries, new_prompts: list[str]) -> tuple[Action, str]:
@@ -112,7 +114,7 @@ class LMController(BaseController):
         # if the action is not parsed, write a wait as a placeholder to avoid frequent inference
         action = self.formatter.parse_action(response, self.action_types)
         if action is None:
-            action = Action(type=Wait)
+            action = Action(type=Inference, content=response)
         return action, response
 
 
@@ -126,11 +128,13 @@ class LMController(BaseController):
         return action, response
 
 
-    def _hypothesize(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> tuple[Action|None, str]:
+    def _hypothesize(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> tuple[Action, str]:
         """ Execute the hypothesis stage """
         msg = self.formatter.format_hypothesize(cache_entries, new_prompts)
         response = self.infer_model.chat_complete(msg)
         action = self.formatter.parse_action(response, self.action_types)
+        if not action:
+            action = Action(type=Inference, content=response)
         return action, response
 
 

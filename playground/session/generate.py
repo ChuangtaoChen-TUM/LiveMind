@@ -8,7 +8,7 @@ def generate_thread_wrapper(generator: ItervLLM, task_queue: Queue, gen_config: 
         inputs = task_queue.get()
         if inputs is None:
             break
-        generator.generate(
+        generator.generate_iter(
             **inputs,
             **gen_config
         )

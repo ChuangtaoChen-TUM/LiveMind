@@ -5,15 +5,11 @@ import pathlib
 import argparse
 import time
 from tqdm import tqdm
-from typing import Callable
 from live_mind import LMController, CompleteCoTController, BaseController
 from live_mind.format.formatter import LMFormatter, CoTFormatter, LMFormat
 from live_mind.text import (
     TextStreamer,
-    nltk_sent_segmenter,
-    nltk_comma_segamenter,
-    chunk_segmenter,
-    char_segmenter
+    get_segmenter,
 )
 from live_mind.utils.dataset import GSM8kDataset, MMLUProDataset, BaseDataset
 from config import BaseModel, MMLU_PRO_PATH, GSM8K_PATH, get_model
@@ -125,35 +121,28 @@ def main(
             json.dump(entry_list, file, indent=4)
 
 
-
-SEGMENTER_MAP: dict[str, Callable[[str], list[str]]] = {
-    "sentence": nltk_sent_segmenter,
-    "clause": nltk_comma_segamenter,
-    "chunk": chunk_segmenter,
-    "char": char_segmenter
-}
-
 FORMAT_MAP = {
-    "u-pi": LMFormat.U_PI,
-    "u-pli": LMFormat.U_PLI,
-    "u-pil": LMFormat.U_PIL,
-    "u-ip": LMFormat.U_IP,
-    "u-ipl": LMFormat.U_IPL,
+    "u-pi"  : LMFormat.U_PI,
+    "u-pli" : LMFormat.U_PLI,
+    "u-pil" : LMFormat.U_PIL,
+    "u-ip"  : LMFormat.U_IP,
+    "u-ipl" : LMFormat.U_IPL,
     "ua-pil": LMFormat.UA_PIL,
-    "u-spi": LMFormat.U_SPI,
+    "u-spi" : LMFormat.U_SPI,
     "ua-spi": LMFormat.UA_SPI
 }
 
 DEFAULT_NUM_QUESTIONS = 1000
 DEFAULT_CHUNK_SIZE = 20
 DEFAULT_SUM_LEN = 5
+DEFAULT_MIN_LEN = 10
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-i",  "--infer-model",   metavar="M",    type=str, default=None, help="inference model: llama-3-8b, llama-3-70b")
     parser.add_argument("-o",  "--out-model",     metavar="M",    type=str, default=None, help="output model: llama-3-8b, llama-3-70b")
     parser.add_argument("-pf", "--prompt-format", metavar="FMT",  type=str, default=None, help=f"prompt format, can be {', '.join(FORMAT_MAP.keys())}")
-    parser.add_argument("-g",  "--granularity",   metavar="G",    type=str, default=None, help=f"granularity of the text streamer, can be {', '.join(SEGMENTER_MAP.keys())}")
+    parser.add_argument("-g",  "--granularity",   metavar="G",    type=str, default=None, help=f"granularity of the text streamer, can be {', '.join(['char', 'chunk', 'sent', 'clause'])}")
     parser.add_argument("-d",  "--dataset",       metavar="D",    type=str, default=None, help="dataset to run the solver on, can be mmlu_pro or gsm8k")
     parser.add_argument("-f",  "--output-file",   metavar="File", type=str, nargs="?", default=False, const=True, help="output results to a json file")
     parser.add_argument("--no-hypo", action="store_false",  dest="hypo", default=True, help="disable hypothesize step after wait")
@@ -164,6 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-retrieve_all", action="store_true", dest="retrieve_all", default=True, help="only retrieve one next prompt instead of all available prompts at each step")
     parser.add_argument("-n", "--num-questions", metavar="N", type=int, default=DEFAULT_NUM_QUESTIONS, help=f"number of questions per category, default: {DEFAULT_NUM_QUESTIONS}")
     parser.add_argument("--chunk-size",          metavar="N", type=int, default=DEFAULT_CHUNK_SIZE,    help=f"chunk size if using chunk granularity, default: {DEFAULT_CHUNK_SIZE}")
+    parser.add_argument("--min-len",             metavar="N", type=int, default=DEFAULT_MIN_LEN, help=f"minimum length of the segment if using sent or clause granularity, default: {DEFAULT_MIN_LEN}")
     parser.add_argument("--sum-len",             metavar="N", type=int, default=DEFAULT_SUM_LEN,       help=f"summarization length, default: {DEFAULT_SUM_LEN}")
     args = parser.parse_args()
 
@@ -201,6 +191,8 @@ if __name__ == "__main__":
             print("Warning: --no-lm is set, the granularity will be ignored")
         if args.chunk_size != DEFAULT_CHUNK_SIZE:
             print("Warning: --no-lm is set, the chunk size will be ignored")
+        if args.min_len != DEFAULT_MIN_LEN:
+            print("Warning: --no-lm is set, the minimum length will be ignored")
         if not args.hypo:
             print("Warning: --no-lm is set, the hypothesis is already disabled")
         if not args.sum:
@@ -240,7 +232,18 @@ if __name__ == "__main__":
             raise ValueError("Please specify the prompt format")
         if args.granularity is None:
             raise ValueError("Please specify the granularity")
-        segmenter = SEGMENTER_MAP[args.granularity]
+        seg_kwargs = {}
+        if args.granularity == "chunk":
+            seg_kwargs["chunk_size"] = args.chunk_size
+        elif args.chunk_size != DEFAULT_CHUNK_SIZE:
+            print("Warning: --granularity is not 'chunk', the chunk size will be ignored")
+    
+        if args.granularity == "sent" or args.granularity == "clause":
+            seg_kwargs["min_len"] = args.min_len
+        elif args.min_len != DEFAULT_MIN_LEN:
+            print("Warning: --granularity is not 'sent' or 'clause', the minimum length will be ignored")
+
+        segmenter = get_segmenter(args.granularity, **seg_kwargs)
         format = FORMAT_MAP[args.prompt_format]
         formmatter = LMFormatter(format)
         if args.sum:

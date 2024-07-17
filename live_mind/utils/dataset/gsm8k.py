@@ -2,7 +2,7 @@ import datasets
 import re
 from .abc import BaseDataset
 
-GSM8k_CATEGORIES = []
+GSM8k_CATEGORIES: list[str] = []
 
 class GSM8kDataset(BaseDataset):
     """ The GSM-8k dataset """
@@ -68,8 +68,8 @@ class GSM8kDataset(BaseDataset):
             print(f"Failed to convert the answer {pred_answer} to float")
             return False
 
-    def add_str(entry: dict) -> str:
-        return ""
+    def add_str(self, entry: dict) -> str|None:
+        return None
 
     @property
     def selected_questions(self):

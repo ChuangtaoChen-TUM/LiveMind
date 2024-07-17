@@ -11,5 +11,5 @@ __all__ = [
 ]
 
 from . import abc, functions, formatter
-from .abc import BaseFormatter, LMFormat
-from .formatter import LMFormatter, CoTFormatter
+from .abc import BaseFormatter
+from .formatter import LMFormatter, CoTFormatter, LMFormat

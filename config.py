@@ -111,7 +111,7 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
             assert len(result) >= len(input)
             assert result[:len(input)] == input
             result = result[len(input):]
-            if result[-1] in stop_token_ids:
+            if len(result) > 0 and result[-1] in stop_token_ids:
                 result = result[:-1]
 
             generated_texts = tokenizer.batch_decode(

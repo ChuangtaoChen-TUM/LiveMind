@@ -11,7 +11,7 @@ CSS ="""
 """
 SYS_MSG_BASE = "You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."
 class LMGradioInterface:
-    def __init__(self, session: Session, assist_session: Session = None, use_lm: bool=True, logger=None):
+    def __init__(self, session: Session, assist_session: Session|None = None, use_lm: bool=True, logger=None):
         self.session = session
         self.assist_session = assist_session
         self.logger = logger

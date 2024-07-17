@@ -1,6 +1,6 @@
 """ modified vllm module to support streaming """
+from typing import Generator, List, Optional, Union
 from vllm import LLM
-from typing import List, Optional, Union
 import torch
 from tqdm import tqdm
 from transformers import TextIteratorStreamer
@@ -15,16 +15,16 @@ class ItervLLM(LLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def generate(
+    def generate_iter(
         self,
         input_ids: torch.Tensor|list[list[int]],
         max_new_tokens: int,
         eos_token_id: list,
-        temperature: float,
-        top_p: float,
+        temperature: float|None,
+        top_p: float|None,
         streamer: TextIteratorStreamer,
         **kwargs,
-    ):
+    ) -> List[List[int]]:
         if temperature is None:
             temperature = 0.0
         if top_p is None:
@@ -43,6 +43,32 @@ class ItervLLM(LLM):
         for output in results:
             outputs.append(output.prompt_token_ids+output.outputs[0].token_ids)
         return outputs
+
+    def generate_gen(
+        self,
+        input_ids: torch.Tensor|list[list[int]],
+        max_new_tokens: int,
+        eos_token_id: list,
+        temperature: float|None,
+        top_p: float|None,
+        streamer: TextIteratorStreamer,
+        **kwargs,
+    ) -> Generator[str, str|None, None]:
+        if temperature is None:
+            temperature = 0.0
+        if top_p is None:
+            top_p = 1.0
+        param = SamplingParams(
+            temperature=temperature,
+            max_tokens=max_new_tokens,
+            top_p=top_p,
+            stop_token_ids=eos_token_id,
+        )
+        if isinstance(input_ids, torch.Tensor):
+            assert input_ids.shape[0] == 1, "Batch size must be 1"
+            input_ids = input_ids.tolist()
+        yield from self._generate(prompt_token_ids=input_ids, sampling_params=param, streamer=streamer)
+
 
     def _generate(
         self,
@@ -135,3 +161,16 @@ class ItervLLM(LLM):
         # its previous requests.
         outputs = sorted(outputs, key=lambda x: int(x.request_id))
         return outputs
+
+    def _run_engine_gen(self) -> Generator[str, str|None, None]:
+        gen_length = 0
+        while self.llm_engine.has_unfinished_requests():
+            step_outputs = self.llm_engine.step()
+            if len(step_outputs) == 1:
+                new_text = step_outputs[0].outputs[0].text[gen_length:]
+                gen_text = step_outputs[0].outputs[0].text
+                gen_length = len(gen_text)
+                echo = yield new_text
+                if echo == "STOP":
+                    yield ""
+                    break

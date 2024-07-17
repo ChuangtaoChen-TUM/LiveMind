@@ -48,7 +48,7 @@ You should respond in the following format (replace the content in the braces wi
 
 
 def format_summarize_sys() -> str:
-    """You are a helpful AI assistant. Your task is to summarize your previous inferences you have made so far. Provide a concise summary of the inferences you have made while retaining the important information. You are given the incomplete problem and your previous inferences on the incomplete problem.
+    """You are a helpful AI assistant. Your task is to summarize and shorten the given inferences. Provide a concise summary of the inferences you have made while retaining the important information.
     
 Respond in the following format (replace the content in the braces with appropriate text): 'action summarize. {summarization}'."""
     return str(format_summarize_sys.__doc__)
@@ -274,7 +274,7 @@ def format_u_spi(cache_entries: list[CacheEntry], new_prompts: list[str]) -> lis
             if msgs:
                 msgs.append("\n")
             msgs.append(f"Prompt: {''.join(temp_prompts)}")
-            msgs.append(f"Inference: {infer_msg}")
+            msgs.append(f"\nInference: {infer_msg}")
             temp_prompts = []
 
     new_prompts = temp_prompts + new_prompts

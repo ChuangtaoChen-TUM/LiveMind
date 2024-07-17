@@ -27,5 +27,6 @@ class BaseDataset(ABC):
         pass
 
     @property
+    @abstractmethod
     def answer_format(self) -> str:
         pass

@@ -19,7 +19,7 @@ class ChatbotApp(App):
             model_name: str,
             assist_model_name: str,
             stream_method:Callable[[str], AsyncGenerator],
-            assist_stream_method:Callable[[str], AsyncGenerator] = None,
+            assist_stream_method:Callable[[str], AsyncGenerator],
             use_lm:bool = True,
             logger=None
         ):
@@ -27,8 +27,7 @@ class ChatbotApp(App):
         self.stream = stream_method
         self.assist_stream = assist_stream_method
         self.use_lm = use_lm
-        self.chat_history = [
-        ]
+        self.chat_history: list[dict[str, str]] = []
         self.action_manager = ActionManager()
         if assist_model_name:
             self.title = "Chatbot: " + model_name + "+" + assist_model_name
@@ -121,7 +120,7 @@ class ChatbotApp(App):
             self.exit()
 
 
-    async def send_user_message(self, content):
+    async def send_user_message(self, content: str):
         input_widget = self.query_one("#input", TextArea)
         new_msg = {"role": "user", "content": content}
         if self.use_lm:
@@ -141,7 +140,7 @@ class ChatbotApp(App):
         self.running_task = create_task(self.get_response(new_prompts))
 
 
-    async def send_message(self, message):
+    async def send_message(self, message: dict[str, str]):
         content = message["content"]
         role = message["role"]
         new_msg = MessageWrapper(content, role)

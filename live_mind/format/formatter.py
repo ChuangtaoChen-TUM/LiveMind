@@ -79,10 +79,18 @@ class LMFormatter(BaseFormatter):
 
     def format_summarize(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
         sys_msg = format_summarize_sys()
-        user_msg = self.formatter_fn(cache_entries, new_prompts) # use the same format as hypothesize
+        inferences = []
+        for entry in cache_entries:
+            for action in entry.actions:
+                if action.formatted_content:
+                    inferences.append(action.formatted_content)
+        user_msg_dict = {
+            "role": "user",
+            "content": " ".join(inferences)
+        }
         msg = [
             {"role": "system", "content": sys_msg},
-            *user_msg
+            user_msg_dict
         ]
         return msg
 
