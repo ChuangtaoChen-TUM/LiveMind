@@ -24,7 +24,8 @@ if __name__ == "__main__":
     if args.textual and args.gradio:
         raise ValueError("Only one interface can be selected")
     if args.log:
-        logger = logging.getLogger('playground_logger')
+        logger: logging.Logger|None = logging.getLogger('playground_logger')
+        assert isinstance(logger, logging.Logger)
         logger.setLevel(logging.INFO)
         file_handler = logging.FileHandler('./playground/log.log')
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

@@ -49,13 +49,17 @@ the response is a dict and should have the following format:
 """
 
 def get_model(name: str):
-    assert name in LLAMA_MODELS + OPENAI_MODELS, f"Model {name} is not supported."
+    assert name in LLAMA_MODELS + OPENAI_MODELS + ANTHROPIC_MODELS, f"Model {name} is not supported."
     if name in LLAMA_MODELS:
         print("using get_model_vllm_example as the model function, you can replace this with your own implementation.")
         return get_model_vllm_example(name) # You can also use this example implementation
-    # elif name in OPENAI_MODELS:
-    #     print("using get_model_openai_example as the model function, you can replace this with your own implementation.")
-    #     return get_model_openai_example(name)
+    elif name in OPENAI_MODELS:
+        print("using get_model_openai_example as the model function, you can replace this with your own implementation.")
+        return get_model_openai_example(name)
+    elif name in ANTHROPIC_MODELS:
+        print("using get_model_anthropic_example as the model function, you can replace this with your own implementation.")
+        return get_model_anthropic_example(name)
+
 
 def get_model_vllm_example(name: str) -> 'BaseModel':
     """ This is an example implementation of the model function using VLLM. You can replace this with your own implementation.
@@ -106,7 +110,7 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
                 use_tqdm=False
             )
             vllm_result = vllm_results[0]
-            result = vllm_result.prompt_token_ids+vllm_result.outputs[0].token_ids
+            result = vllm_result.prompt_token_ids+list(vllm_result.outputs[0].token_ids)
             # remove the input tokens from the output
             assert len(result) >= len(input)
             assert result[:len(input)] == input
@@ -125,73 +129,70 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
     return model_with_chat_complete
 
 
-# def get_model_openai_example(name: str) -> 'BaseModel':
-#     import openai
-#     assert name in OPENAI_MODELS, f"Model {name} is not supported."
-#     client = openai.OpenAI()
+def get_model_openai_example(name: str) -> 'BaseModel':
+    import openai
+    assert name in OPENAI_MODELS, f"Model {name} is not supported."
+    client = openai.OpenAI()
 
-#     class Model(BaseModel):
-#         def chat_complete(self, message):
-#             response = client.chat.completions.create(
-#                 model=name,
-#                 messages=message,
-#                 temperature=0,
-#             )
-#             return response
+    class Model(BaseModel):
+        def chat_complete(self, message):
+            response = client.chat.completions.create(
+                model=name,
+                messages=message,
+                temperature=0,
+            )
+            response_text = response.choices[0].message.content
+            if not response_text:
+                response_text = ""
+            return response_text
         
-#     model_with_chat_complete = Model()
-#     return model_with_chat_complete
+    model_with_chat_complete = Model()
+    return model_with_chat_complete
 
-# def get_model_anthropic_example(name: str) -> 'BaseModel':
-#     import anthropic
-#     assert name in ANTHROPIC_MODELS, f"Model {name} is not supported."
-#     model_name_dict = {
-#         "claude-3-5-sonnet": "claude-3-5-sonnet-20240620",
-#         "claude-3-opus": "claude-3-opus-20240229",
-#         "claude-3-sonnet": "claude-3-sonnet-20240229"
-#     }
-#     client = anthropic.Anthropic()
+def get_model_anthropic_example(name: str) -> 'BaseModel':
+    import anthropic
+    assert name in ANTHROPIC_MODELS, f"Model {name} is not supported."
+    model_name_dict = {
+        "claude-3-5-sonnet": "claude-3-5-sonnet-20240620",
+        "claude-3-opus": "claude-3-opus-20240229",
+        "claude-3-sonnet": "claude-3-sonnet-20240229"
+    }
+    client = anthropic.Anthropic()
     
-#     class Model(BaseModel):
-#         def chat_complete(self, message):
-#             system_message, message = self._convert_to_anthropic_format(message)
-#             if system_message == "":
-#                 system_message = anthropic.NOT_GIVEN
-#             response = client.messages.create(
-#                 model=model_name_dict[name],
-#                 system=system_message,
-#                 messages=message,
-#                 temperature=0,
-#                 max_tokens=4096
-#             )
-#             content = response.content[0].text
-#             usage = response.usage
-#             output = {
-#                 "choices": [{"message": {"content": content, "role": "assistant"}}],
-#                 "usage": {
-#                     "completion_tokens": usage.output_tokens,
-#                     "prompt_tokens": usage.input_tokens,
-#                     "total_tokens": usage.input_tokens + usage.output_tokens
-#                 }
-#             }
-#             return output
+    class Model(BaseModel):
+        def chat_complete(self, message):
+            system_message, message = self._convert_to_anthropic_format(message)
+            if system_message == "":
+                system_message = anthropic.NOT_GIVEN
+            response = client.messages.create(
+                model=model_name_dict[name],
+                system=system_message,
+                messages=message,
+                temperature=0,
+                max_tokens=4096
+            )
+            if response.content:
+                response_text = response.content[0]
+                text = response_text.text
+                if isinstance(text, str):
+                    return text
+            return ""
         
-#         @staticmethod
-#         def _convert_to_anthropic_format(message: list[dict[str, str]]):
-#             system_message = ""
-#             formatted_message = []
-#             for m in message:
-#                 if m["role"] == "system":
-#                     system_message += m["content"]
-#                 else:
-#                     formatted_message.append({
-#                         "role": m["role"],
-#                         "content": [{"type": "text", "text": m["content"]}]
-#                     })
-#             return system_message, formatted_message
-    
-#     model_with_chat_complete = Model()
-#     return model_with_chat_complete
+        @staticmethod
+        def _convert_to_anthropic_format(message: list[dict[str, str]]):
+            system_message = ""
+            formatted_message = []
+            for m in message:
+                if m["role"] == "system":
+                    system_message += m["content"]
+                else:
+                    formatted_message.append({
+                        "role": m["role"],
+                        "content": [{"type": "text", "text": m["content"]}]
+                    })
+            return system_message, formatted_message
+
+    return Model()
 
 
 class BaseModel(ABC):

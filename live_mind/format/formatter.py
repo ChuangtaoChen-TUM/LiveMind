@@ -119,26 +119,22 @@ class CoTFormatter(BaseFormatter):
 
     """ The CompleteCoTFormatter is a formatter for the CompleteCoTController with CoT system prompt """
     def format_output(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
-        if self.use_cot:
-            sys_msg = self._format_output_sys_cot()
-        else:
-            sys_msg = self._format_output_sys()
         user_msg = self._format_output_user(cache_entries, new_prompts)
-        msg = [
-            {"role": "system", "content": sys_msg},
-            {"role": "user", "content": user_msg}
-        ]
+        if self.use_cot:
+            sys_msg = self._format_output_sys()
+            msg = [
+                {"role": "system", "content": sys_msg},
+                {"role": "user", "content": user_msg}
+            ]
+        else:
+            msg = [
+                {"role": "user", "content": user_msg}
+            ]
         return msg
 
-
     def _format_output_sys(self) -> str:
-        """You are a helpful AI assistant, and your tasks is to understand and solve a problem."""
-        return str(self._format_output_sys.__doc__)
-
-
-    def _format_output_sys_cot(self) -> str:
         """You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."""
-        return str(self._format_output_sys_cot.__doc__)
+        return str(self._format_output_sys.__doc__)
 
 
     def _format_output_user(self, cache_entries: list[CacheEntry], new_prompts: list[str]) -> str:

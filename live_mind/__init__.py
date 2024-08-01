@@ -1,3 +1,32 @@
+""" Controllers for the LiveMind framework
+usage:
+pseudo code:
+
+from live_mind import LMController
+
+controller = LMController(...)
+
+input_stream = ... # the input stream for the controller
+stream_end = False
+
+while not stream_end:
+    input_stream.wait() # wait till the input_stream changes
+    stream_end = input_stream.is_end()
+    for response in controller(input_stream.text, stream_end=stream_end):
+        print(response)
+
+controller.reset()
+"""
+
+__all__ = [
+    'LMController',
+    'CompleteCoTController',
+    'action',
+    'format',
+    'text',
+    'utils'
+]
+
 from collections.abc import Callable, Generator
 import logging
 from .abc import BaseController, BaseModel
@@ -5,6 +34,10 @@ from .action import Action
 from .action.cache import SegmentActionCache, CacheEntry
 from .action.actions import Wait, Inference, Hypothesize, Summarize, Response
 from .format import BaseFormatter
+from . import action
+from . import format
+from . import text
+from . import utils
 
 class LMController(BaseController):
     """ the LMController::
@@ -50,7 +83,7 @@ class LMController(BaseController):
 
 
     def  __call__(self, prompt: str, stream_end:bool=False) -> Generator[str, None, None]:
-        """ Return the generator for response of the LLM given the prompt """
+        """ Return the generator of responses from the LLM given the prompt """
         prompts = self.segmenter(prompt)
         if not stream_end:
             prompts = prompts[:-1]
@@ -153,15 +186,23 @@ class LMController(BaseController):
 
 class CompleteCoTController(BaseController):
     """ The CompleteCoTController is a controller that simulate conventional conversation with the LLM with complete prompts. """
-    def __init__(self, formatter: BaseFormatter, output_model: BaseModel) -> None:
+    def __init__(
+        self,
+        formatter: BaseFormatter,
+        output_model: BaseModel,
+        answer_format: str|None = None
+    ) -> None:
         self.formatter = formatter
         self.output_model = output_model
+        self.answer_format = answer_format
 
     def __call__(self, prompt:str, stream_end:bool=False) -> Generator[str, None, None]:
         """ Return the generator for the response of the LLM given the prompt """
         if not stream_end:
             return
         msg = self.formatter.format_output([], [prompt,])
+        if self.answer_format:
+            msg[-1]['content'] += "\n\n"+self.answer_format
         yield self.output_model.chat_complete(msg)
 
     def reset(self):

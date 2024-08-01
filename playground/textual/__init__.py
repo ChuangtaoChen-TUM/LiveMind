@@ -4,13 +4,22 @@ from ..session import Session
 
 class LiveMindTextual:
     """ Chat interface using Textual interface """
-    def __init__(self, session: Session, assist_session:Session=None, use_lm=True, logger=None) -> None:
+    def __init__(
+        self,
+        session: Session,
+        assist_session:Session|None=None,
+        use_lm=True,
+        logger=None
+    ) -> None:
         self.session = session
         self.assist_session = assist_session
         model_name = self.session.model_name
         stream = self.stream
         assist_stream = self.assist_stream if assist_session else None
-        assist_model_name = self.assist_session.model_name if assist_session else None
+        if self.assist_session:
+            assist_model_name = self.assist_session.model_name
+        else:
+            assist_model_name = None
         self.chat_app = ChatbotApp(
             model_name,
             assist_model_name,

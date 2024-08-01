@@ -15,14 +15,14 @@ class ChatbotApp(App):
     TITLE = "Chatbot"
 
     def __init__(
-            self,
-            model_name: str,
-            assist_model_name: str,
-            stream_method:Callable[[str], AsyncGenerator],
-            assist_stream_method:Callable[[str], AsyncGenerator],
-            use_lm:bool = True,
-            logger=None
-        ):
+        self,
+        model_name: str,
+        assist_model_name: str|None,
+        stream_method:Callable[[str], AsyncGenerator],
+        assist_stream_method:Callable[[str], AsyncGenerator],
+        use_lm:bool = True,
+        logger=None
+    ):
         super().__init__()
         self.stream = stream_method
         self.assist_stream = assist_stream_method

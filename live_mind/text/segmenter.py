@@ -6,7 +6,7 @@ __all__ = [
     "nltk_comma_segmenter"
 ]
 
-from nltk.tokenize import sent_tokenize
+from nltk.tokenize import sent_tokenize, word_tokenize
 from typing import Callable
 
 
@@ -19,6 +19,11 @@ def get_segmenter(name: str, **kwargs) -> Callable[[str], list[str]]:
             chunk_size = kwargs.get("chunk_size", 10)
             def segmenter(text: str) -> list[str]:
                 return chunk_segmenter(text, chunk_size)
+            return segmenter
+
+        case "word":
+            def segmenter(text: str) -> list[str]:
+                return word_tokenize(text, preserve_line=True)
             return segmenter
 
         case "sent":

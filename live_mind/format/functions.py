@@ -10,12 +10,12 @@ from ..action.actions import Wait
 
 class LMFormat(Enum):
     """ Format Enum for the LMFormatter """
-    U_PI = "user_prompt_inference"
-    U_PLI = "user_prompt_last_prompt_inference"
-    U_PIL = "user_prompt_inference_last_prompt"
-    U_IP = "user_inference_prompt"
-    U_IPL = "user_inference_prompt_last_prompt"
-    U_SPI = "user_sequence_prompt_inference"
+    U_PI   = "user_prompt_inference"
+    U_PLI  = "user_prompt_last_prompt_inference"
+    U_PIL  = "user_prompt_inference_last_prompt"
+    U_IP   = "user_inference_prompt"
+    U_IPL  = "user_inference_prompt_last_prompt"
+    U_SPI  = "user_sequence_prompt_inference"
     UA_PIL = "user_assistant_prompt_inference_last_prompt"
     UA_SPI = "user_assistant_sequence_prompt_inference"
 
@@ -32,7 +32,7 @@ If you choose to wait, respond with 'action wait.' without any additional conten
 
 
 def format_output_sys() -> str:
-    """You are a helpful AI assistant. Your are given a problem and previous inferences you have made about the problem. Your task is to make inferences to solve the problem.
+    """You are a helpful AI assistant. You are given a problem and previous inferences you have made about the problem. Your task is to make inferences to solve the problem.
 
 You should use your previous inferences without directly mentioning them. For example, avoid using irrelevant phrases like "Based on my previous inferences". Instead, respond directly with your new inferences and answer to the problem. Answer directly if you have obtained the answer in your previous inferences, otherwise make minimal additional inferences to solve the problem."""
     return str(format_output_sys.__doc__)
