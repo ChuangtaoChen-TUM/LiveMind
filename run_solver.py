@@ -20,8 +20,8 @@ def main(
     inference_model: BaseModel,
     output_model: BaseModel,
     dataset: BaseDataset,
+    input_speed: int,
     output_file: str|None=None,
-    print_index: bool=False
 ):
     """ Run the solver on the MMLU Pro dataset and log the results if needed. """
     # warm up the models
@@ -30,8 +30,10 @@ def main(
     entry_list = []
     num_correct = 0
     num_total = 0
-    def delay_fn(text: str): # delay function to simulate the typing speed
-        return 0.25*len(text)
+
+
+    def delay_fn(text: str) -> float: # delay function to simulate the typing speed (seconds)
+        return len(text) / input_speed * 60
 
     tqdm_bar = tqdm(dataset.selected_questions)
     for entry in tqdm_bar:
@@ -39,7 +41,6 @@ def main(
         final_text = dataset.add_str(entry)
         streamer = TextStreamer(
             question,
-            granularity="char", # typing character by character
             delay_fn=delay_fn,
             final_text=final_text
         )
@@ -113,9 +114,6 @@ def main(
 
         # verify the answer
         tqdm_bar.set_description(f"Accuracy: {num_correct/num_total:.2f}")
-        # if print_index is set, print the index of the question
-        if print_index:
-            print(f"No. {num_total}, Accuracy: {num_correct/num_total:.2f}")
 
     print(f"Accuracy: {num_correct/num_total:.2f}")
     if output_file:
@@ -124,25 +122,28 @@ def main(
         with open(output_file, "w", encoding='utf-8') as file:
             json.dump(entry_list, file, indent=4)
 
-
 FORMAT_MAP = {
     "u-pi"  : LMFormat.U_PI,
     "u-pli" : LMFormat.U_PLI,
-    "u-pil" : LMFormat.U_PIL,
-    "u-ip"  : LMFormat.U_IP,
-    "u-ipl" : LMFormat.U_IPL,
+    # "u-pil" : LMFormat.U_PIL,
+    # "u-ip"  : LMFormat.U_IP,
+    # "u-ipl" : LMFormat.U_IPL,
     "ua-pil": LMFormat.UA_PIL,
     "u-spi" : LMFormat.U_SPI,
-    "ua-spi": LMFormat.UA_SPI
+    "ua-spi": LMFormat.UA_SPI,
+    # "ua-pf" : LMFormat.UA_PF,
 }
 GRAUNLARITIES = ["char", "word", "sent", "clause"]
 DATASET_MAP = {
-    "mmlu_pro": MMLUProDataset,
+    "mmlu-pro": MMLUProDataset,
     "gsm8k": GSM8kDataset
 }
-DEFAULT_NUM_QUESTIONS = 1000
+
+DEFAULT_NUM_QUESTIONS = 1024
 DEFAULT_SUM_LEN = -1
 DEFAULT_MIN_LEN = 10
+DEFAULT_INPUT_SPEED = 240 # characters per minute
+SEED = 42
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -152,30 +153,28 @@ if __name__ == "__main__":
     parser.add_argument("-g",  "--granularity",   metavar="G",    type=str, default=None, choices=GRAUNLARITIES, help=f"granularity of the text streamer, can be {', '.join(GRAUNLARITIES)}")
     parser.add_argument("-d",  "--dataset",       metavar="D",    type=str, default=None, choices=DATASET_MAP.keys(), help=f"dataset to run the solver on, can be {', '.join(DATASET_MAP.keys())}")
     parser.add_argument("-f",  "--output-file",   metavar="File", type=str, nargs="?", default=False, const=True, help="output results to a json file")
-    parser.add_argument("--no-hypo", action="store_false",  dest="hypo", default=True,  help="disable hypothesize step after wait")
-    parser.add_argument("--no-sum",  action="store_false",  dest="sum",  default=True,  help="disable summarization step")
+    parser.add_argument("-is", "--input-speed",   metavar="S",    type=int, default=DEFAULT_INPUT_SPEED, help=f"input speed in characters per minute, default: {DEFAULT_INPUT_SPEED}")
     parser.add_argument("--no-lm",   action="store_false",  dest="lm",   default=True,  help="disable LiveMind framework, use baseline solver instead")
     parser.add_argument("--no-cot",  action="store_false",  dest="cot",  default=True,  help="disable chain-of-thoughts when using baseline solver")
+    parser.add_argument("--no-wait", action="store_false",  dest="wait", default=True,  help="disable waiting for the model to generate the response")
     parser.add_argument("--log",     action="store_false",  dest="log",  default=False, help="log the results")
-    parser.add_argument("--no-retrieve-all", action="store_false", dest="retrieve_all", default=True, help="only retrieve one next prompt instead of all available prompts at each step")
     parser.add_argument("-n", "--num-questions", metavar="N", type=int, default=DEFAULT_NUM_QUESTIONS, help=f"number of questions per category, -1 for all questions, default: {DEFAULT_NUM_QUESTIONS}")
     parser.add_argument("--min-len",             metavar="N", type=int, default=DEFAULT_MIN_LEN, help=f"minimum length of the segment if using sent or clause granularity, default: {DEFAULT_MIN_LEN}")
-    parser.add_argument("--sum-len",             metavar="N", type=int, default=DEFAULT_SUM_LEN,       help=f"summarization length, default: {DEFAULT_SUM_LEN}")
+    # parser.add_argument("--sum-len",             metavar="N", type=int, default=DEFAULT_SUM_LEN,       help=f"summarization length, default: {DEFAULT_SUM_LEN}")
     parser.add_argument("--overwrite", action="store_true", help="overwrite the output file if it exists")
-    parser.add_argument("-p", "--print-index", action="store_true", help="besides the progress bar, also print the index of the question")
     args = parser.parse_args()
 
     # check arguments
     # load the dataset
     dataset_name: str = args.dataset
-    if dataset_name == "mmlu_pro":
+    if dataset_name == "mmlu-pro":
         if not MMLU_PRO_PATH:
             raise ValueError("Please set the path to the MMLU-Pro dataset in config.py")
     elif dataset_name == "gsm8k":
         if not GSM8K_PATH:
             raise ValueError("Please set the path to the GSM8K dataset in config.py")
     else:
-        raise ValueError("Invalid dataset, please choose either 'mmlu_pro' or 'gsm8k'")
+        raise ValueError("Invalid dataset, please choose either 'mmlu-pro' or 'gsm8k'")
 
     num_questions = int(args.num_questions)
     assert num_questions == -1 or num_questions > 0
@@ -195,12 +194,13 @@ if __name__ == "__main__":
         if out_model_name is None:
             print("Warning: --out-model is not set, use the inference model as output model")
             out_model_name = infer_model_name
-        if not args.sum and args.sum_len != DEFAULT_SUM_LEN:
-            print("Warning: --use-sum is not set, the summarization length will be ignored")
         if not args.cot:
             print("Warning: --no-cot is set, when using LiveMind framework, the chain-of-thoughts setting will be ignored")
         if args.granularity not in ["sent", "clause"] and args.min_len != DEFAULT_MIN_LEN:
             print("Warning: --granularity is not 'sent' or 'clause', the minimum length will be ignored")
+        if args.wait is not True and args.granularity not in ["sent", "clause"]:
+            print("Warning: granularity is not 'sent' or 'clause', the waiting setting will be ignored")
+            args.wait = True
     else: # baseline
         if out_model_name is None:
             raise ValueError("Please specify the output model")
@@ -212,14 +212,10 @@ if __name__ == "__main__":
             print("Warning: --no-lm is set, the granularity will be ignored")
         if args.min_len != DEFAULT_MIN_LEN:
             print("Warning: --no-lm is set, the minimum length will be ignored")
-        if not args.hypo:
-            print("Warning: --no-lm is set, the hypothesis is already disabled")
-        if not args.sum:
-            print("Warning: --no-lm is set, the summarization is already disabled")
-        if not args.retrieve_all:
-            print("Warning: --no-lm is set, the retrieve-all is already disabled")
-        if args.sum_len != DEFAULT_SUM_LEN:
-            print("Warning: --no-lm is set, the summarization length will be ignored")
+        if args.wait is not True:
+            print("Warning: --no-lm is set, the waiting setting will be ignored")
+        # if args.sum_len != DEFAULT_SUM_LEN:
+        #     print("Warning: --no-lm is set, the summarization length will be ignored")
 
     # logger configuration
     logger: logging.Logger|None = None
@@ -233,11 +229,11 @@ if __name__ == "__main__":
         logger.addHandler(file_handler)
 
     # load the dataset
-    if dataset_name == "mmlu_pro":
+    if dataset_name == "mmlu-pro":
         dataset: BaseDataset = MMLUProDataset(MMLU_PRO_PATH)
     elif dataset_name == "gsm8k":
         dataset = GSM8kDataset(GSM8K_PATH)
-    dataset.select(num_questions, randomize=True, seed=42, split='test')
+    dataset.select(num_questions, randomize=True, seed=SEED, split='test')
 
     # set the solver
     if use_lm: # LiveMind framework
@@ -253,19 +249,18 @@ if __name__ == "__main__":
             seg_kwargs = {}
         segmenter = get_segmenter(args.granularity, **seg_kwargs)
         format = FORMAT_MAP[args.prompt_format]
-        formmatter = LMFormatter(format)
-        if args.sum:
-            sum_len = args.sum_len
-        else:
-            sum_len = -1
+        formmatter = LMFormatter(format, args.wait)
+
+        if format == LMFormat.UA_PF:
+            if not inference_model.support_prefill or not output_model.support_prefill:
+                raise ValueError("The model does not support prefilling, please choose a different prompt format")
+
         controller: BaseController = LMController(
             segmenter,
             formmatter,
             inference_model,
             output_model,
-            hypothesize=args.hypo,
-            summarize_len=sum_len,
-            retreive_all=args.retrieve_all,
+            # summarize_len=args.sum_len,
             answer_format=dataset.answer_format,
             logger=logger
         )
@@ -283,11 +278,14 @@ if __name__ == "__main__":
         if args.output_file: # output file set but not given
             if use_lm:
                 g_str = args.granularity
-                sum_str = f"sum-{args.sum_len}" if args.sum else "no-sum"
-                hypo_str = "hypo" if args.hypo else "no-hypo"
-                ra_str = "ra" if args.retrieve_all else "no-ra"
+                # sum_str = f"sum-{args.sum_len}" if args.sum_len != DEFAULT_SUM_LEN else "no-sum"
                 num_q_str = f"{args.num_questions}q"
-                output_file: str|None = f"./output/{dataset_name}/lm_{infer_model_name}_{out_model_name}_{args.prompt_format}_{g_str}_{sum_str}_{hypo_str}_{ra_str}_{num_q_str}.json"
+                input_speed_str = f"{args.input_speed}cpm"
+                if args.wait is not True:
+                    wait_str = "no-wait"
+                else:
+                    wait_str = "wait"
+                output_file: str|None = f"./output/{dataset_name}/lm_{infer_model_name}_{out_model_name}_{args.prompt_format}_{g_str}_{input_speed_str}_{wait_str}_{num_q_str}.json"
             else:
                 cot_str = "cot" if args.cot else "no-cot"
                 output_file = f"./output/{dataset_name}/base_{out_model_name}_{cot_str}_{args.num_questions}q.json"
@@ -304,12 +302,11 @@ if __name__ == "__main__":
             print(f"Output file {output_file} already exists, overwrite it")
         else:
             raise FileExistsError(f"Output file {output_file} already exists, please use --overwrite to overwrite it")
-
     main(
         controller=controller,
         inference_model=inference_model,
         output_model=output_model,
+        input_speed=args.input_speed,
         dataset=dataset,
         output_file=output_file,
-        print_index=args.print_index
     )

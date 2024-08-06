@@ -18,23 +18,34 @@ class LMFormat(Enum):
     U_SPI  = "user_sequence_prompt_inference"
     UA_PIL = "user_assistant_prompt_inference_last_prompt"
     UA_SPI = "user_assistant_sequence_prompt_inference"
+    UA_PF = "user_assistant_prefill"
 
 
 def format_inference_sys() -> str:
-    """You are a helpful large language model tasked with solving a problem based on user input. The user is currently providing input, and you need to make inferences based on the incomplete information available so far. These inferences will help you solve the problem more efficiently when more input arrives. You are given the incomplete problem and your previous inferences on the incomplete problem.
+    """The user is currently providing input, and you need to make inferences to obtain some temporary results based on the incomplete information available so far. These results will help you solve the problem more efficiently when more input arrives. You are given the incomplete problem and your previous inferences on the incomplete problem.
 
-You can choose to make a new inference or wait if you need more information.
-If you choose to make a new inference, respond in the following format (replace the content in the braces with appropriate text): 'action inference. {content}'.
-The content should be only relevant to content you are inferring based on the incomplete problem and your previous inferences.
+You can choose to make a new inference or wait if the incremental input is not enough to make a new inference.
+If you choose to make a new inference, respond in the following format: 'action inference. {content}'.
 
-If you choose to wait, respond with 'action wait.' without any additional content."""
+The content should be relevant to content you are inferring based on the incomplete problem and your previous inferences.
+
+If you choose to wait for more information, simply respond with 'action wait.' without any additional content."""
     return str(format_inference_sys.__doc__)
+
+def format_inference_no_wait_sys() -> str:
+    """The user is currently providing input, and you need to make inferences to obtain some temporary results based on the incomplete information available so far. These results will help you solve the problem more efficiently when more input arrives. You are given the incomplete problem and your previous inferences on the incomplete problem.
+
+you need to make a new inference based on the input, respond in the following format: 'action inference. {content}'.
+
+The content should be relevant to content you are inferring based on the incomplete problem and your previous inferences."""
+    return str(format_inference_no_wait_sys.__doc__)
 
 
 def format_output_sys() -> str:
-    """You are a helpful AI assistant. You are given a problem and previous inferences you have made about the problem. Your task is to make inferences to solve the problem.
+    """You are given a problem and previous inferences you have made about the problem to solve the problem.
 
-You should use your previous inferences without directly mentioning them. For example, avoid using irrelevant phrases like "Based on my previous inferences". Instead, respond directly with your new inferences and answer to the problem. Answer directly if you have obtained the answer in your previous inferences, otherwise make minimal additional inferences to solve the problem."""
+You should make the best use your previous inferences. Respond with your new inferences and your answer to the problem.
+You can answer directly if you can obtain the answer in your previous inferences, otherwise make minimal additional inferences to solve the problem."""
     return str(format_output_sys.__doc__)
 
 
@@ -394,6 +405,44 @@ def format_ua_spi(cache_entries: list[CacheEntry], new_prompts: list[str]) -> li
 
     return msg_dict
 
+
+def format_ua_pf(cache_entries: list[CacheEntry], new_prompts: list[str]) -> list[dict[str, str]]:
+    """ Format the user prompt with user_assistant_prefill format:
+    User: prompt
+    Assistant: previous inference
+
+    The model must support prefill function for this format.
+    """
+    old_prompts = [prompt for entry in cache_entries for prompt in entry.prompts]
+    old_actions = [action for entry in cache_entries for action in entry.actions]
+
+    all_prompts = old_prompts + new_prompts
+
+    msg = []
+    if all_prompts:
+        user_msg = {
+            "role" : "user",
+            "content" : "".join(all_prompts)
+        }
+        msg.append(user_msg)
+
+    infer_msgs = []
+    for action in old_actions:
+        if action.formatted_content:
+            infer_msgs.append(action.formatted_content)
+
+    if infer_msgs:
+        infer_msg_str = " ".join(infer_msgs)
+        infer_msg_str = infer_msg_str.strip("\n") + "\n\n"
+        assistant_msg = {
+            "role" : "assistant",
+            "content" : infer_msg_str
+        }
+        msg.append(assistant_msg)
+
+    return msg
+
+
 FORMATTER_MAP = {
     LMFormat.U_PI : format_u_pi,
     LMFormat.U_PLI : format_u_pli,
@@ -402,5 +451,6 @@ FORMATTER_MAP = {
     LMFormat.U_IPL : format_u_ipl,
     LMFormat.U_SPI : format_u_spi,
     LMFormat.UA_PIL : format_ua_pil,
-    LMFormat.UA_SPI : format_ua_spi
+    LMFormat.UA_SPI : format_ua_spi,
+    LMFormat.UA_PF : format_ua_pf,
 }

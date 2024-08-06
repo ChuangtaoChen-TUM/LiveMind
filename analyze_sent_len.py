@@ -46,3 +46,4 @@ if __name__ == '__main__':
     for file in files:
         if file.endswith('.json'):
             analyze_latency(file)
+

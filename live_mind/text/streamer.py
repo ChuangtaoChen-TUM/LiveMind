@@ -9,26 +9,26 @@ from .segmenter import nltk_sent_segmenter
 from .abc import BaseTextStreamer
 
 class TextStreamer(BaseTextStreamer):
-    """ Streamer for text data. The texts will be generated based on `current_time` in the simulation.
-    
-    `next`: generate next text and current time will be updated to the time when the text is generated.
-    
-    `wait`: get text generated in a period of time. Current time will be updated based on `delay`.
-
+    """ Simulator for typing of text data. The texts will be generated based on `current_time` in the simulation.
+    - args:
+        - text: the text to be streamed
+        - delay_fn: a function that takes a text and returns the time required to type the text
+        - granularity: how the text is typed. Default is "char". 
+        - final_text: the final text attached to the end of the text stream. The final text does not have delay.
+        - config: additional configuration for the generator
     """
     def __init__(
         self,
         text: str,
-        granularity: str,
         delay_fn: Callable[[str], float],
+        granularity: str = "char",
         final_text: Optional[str] = None,
         config: dict = {}, # additional configuration for the generator
     ):
         assert granularity in ["char", "chunk", "token", "sentence"]
         self.delay_fn = delay_fn
         self.text = self.split(text, granularity, **config)
-        if final_text:
-            self.text.append(final_text)
+        self.final_text = final_text
         self.index = 0
         self.current_time = 0.0 # current time
         self.last_gen_time = 0.0 # when the last text was generated
@@ -37,20 +37,29 @@ class TextStreamer(BaseTextStreamer):
 
 
     def next(self) -> str|None:
-        """ Generate the next text. Current time will be updated to the time when the text is generated.
-        Return `None` if the streamer reaches the end of the text, in this case current time will not be updated """
+        """ Generate the next text according to the graunlarity.
+            Current time will be updated to the time when the text is generated.
+            Return `None` if the streamer reaches the end of the text, in this case current time will not be updated
+        """
         if self.index >= self.max_index:
             return None
+
         next_text = self.text[self.index]
-        self.index += 1
         delay = self.delay_fn(next_text)
+        self.index += 1
+
+        if self.index == self.max_index and self.final_text:
+            next_text += self.final_text
+
         self.last_gen_time += delay
         self.current_time = self.last_gen_time
         return next_text
 
 
     def wait(self, delay: float) -> str|None:
-        """ get text generated in a period of time, return `None` if no text is generated. Current time will be updated. """
+        """ get text generated in a period of time, return `None` if no text is generated.
+        No matter if any text is generated, the current time will be updated by the delay time.
+        """
         assert delay >= 0
         texts = []
         while True:
@@ -64,11 +73,15 @@ class TextStreamer(BaseTextStreamer):
                 # time is not enough to generate the next text
                 break
             # update delay, current time and last generation time
+            self.index += 1
             delay -= next_time
             self.current_time += next_time
             self.last_gen_time = self.current_time
+
+            if self.index == self.max_index and self.final_text:
+                next_text += self.final_text
             texts.append(next_text)
-            self.index += 1
+
         self.current_time += delay # add the remaining delay time to the current time
 
         if texts:

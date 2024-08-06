@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from .functions import (
     LMFormat,
     format_inference_sys,
+    format_inference_no_wait_sys,
     format_output_sys,
     format_hypothesize_sys,
     format_summarize_sys,
@@ -30,9 +31,11 @@ class LMFormatter(BaseFormatter):
     def __init__(
         self,
         format_type: LMFormat,
+        enable_wait: bool = True,
     ):
         self.cached_prompts: dict[str, str] = {}
         self.formatter_fn = FORMATTER_MAP[format_type]
+        self.enable_wait = enable_wait
 
 
     def format_inference(
@@ -40,7 +43,11 @@ class LMFormatter(BaseFormatter):
         cache_entries: list[CacheEntry],
         new_prompts: list[str]
     ) -> list[dict[str, str]]:
-        sys_msg = format_inference_sys()
+        if self.enable_wait:
+            sys_msg = format_inference_sys()
+        else:
+            sys_msg = format_inference_no_wait_sys()
+        
         user_msg: list[dict[str, str]] = self.formatter_fn(cache_entries, new_prompts)
         msg = [
             {"role": "system", "content": sys_msg},

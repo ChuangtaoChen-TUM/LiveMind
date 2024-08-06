@@ -3,7 +3,8 @@ __all__ = [
     "char_segmenter",
     "chunk_segmenter",
     "nltk_sent_segmenter",
-    "nltk_comma_segmenter"
+    "nltk_comma_segmenter",
+    "nltk_word_segmenter",
 ]
 
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -23,7 +24,7 @@ def get_segmenter(name: str, **kwargs) -> Callable[[str], list[str]]:
 
         case "word":
             def segmenter(text: str) -> list[str]:
-                return word_tokenize(text, preserve_line=True)
+                return nltk_word_segmenter(text)
             return segmenter
 
         case "sent":
@@ -47,6 +48,31 @@ def char_segmenter(text: str) -> list[str]:
 
 def chunk_segmenter(text: str, chunk_size: int=10) -> list[str]:
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
+
+
+def nltk_word_segmenter(text):
+    words = word_tokenize(text, preserve_line=True)
+
+    if not words:
+        return []
+
+    # Add a space to the start of each word starting with number or letter
+    # except the first one
+    new_words = [words[0]]
+
+    if len(words) == 1:
+        return new_words
+
+    for word in words[1:]:
+        if len(word) == 0:
+            continue
+        if word[0].isalnum():
+            new_words.append(" " + word)
+        else:
+            new_words.append(word)
+    
+    return new_words
 
 
 def nltk_sent_segmenter(text: str, min_len: int=10) -> list[str]:

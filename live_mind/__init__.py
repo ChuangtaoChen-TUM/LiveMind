@@ -47,7 +47,6 @@ class LMController(BaseController):
     - `infer_model`: `BaseModel`: the model for the inference stage
     - `output_model`: `BaseModel`: the model for the output stage
     - `hypothesize`: `bool`: whether to hypothesize, default: `False`
-    - `retreive_all`: `bool`: whether to retreive all the prompts, default: `True`. If `False`, only update one prompt segment at a time.
     - `summarize_len`: `int`: the number of prompts to summarize, default: `-1` (no summarization)
     - `answer_format`: `str|None`: the format for the answer. The `answer_format` is append to the final prompt at the output stage. default: `None`
     - `logger`: `logging.Logger|None`: the logger for the controller, default: `None`
@@ -60,7 +59,6 @@ class LMController(BaseController):
         infer_model: BaseModel,
         output_model: BaseModel,
         hypothesize: bool = False,
-        retreive_all: bool = True,
         summarize_len: int = -1,
         answer_format: str|None = None,
         logger: logging.Logger|None = None
@@ -72,7 +70,6 @@ class LMController(BaseController):
         self.output_model = output_model
         self.hypothesize = hypothesize
         self.summarize_len = summarize_len
-        self.retreive_all = retreive_all
         self.logger = logger
         self.answer_format = answer_format
         self.action_types = [Wait, Inference]
@@ -90,15 +87,7 @@ class LMController(BaseController):
         cache_entries, new_prompts = self.action_cache.read_action(prompts)
         if not new_prompts:
             return
-        if self.retreive_all:
-            yield from self._step(cache_entries, new_prompts, stream_end)
-        else:
-            start_index = len(prompts) - len(new_prompts)
-            for i in range(len(new_prompts) - 1):
-                cache_entries, new_prompts = self.action_cache.read_action(prompts[:start_index+i+1])
-                yield from self._step(cache_entries, new_prompts, stream_end=False)
-            cache_entries, new_prompts = self.action_cache.read_action(prompts)
-            yield from self._step(cache_entries, new_prompts, stream_end)
+        yield from self._step(cache_entries, new_prompts, stream_end)
 
 
     def _step(self, cache_entries: list[CacheEntry], new_prompts:list[str], stream_end: bool=False) -> Generator[str, None, None]:
@@ -155,7 +144,12 @@ class LMController(BaseController):
         """ execute the output stage """
         msg = self.formatter.format_output(cache_entries, new_prompts)
         if self.answer_format:
-            msg[-1]['content'] += "\n\n"+self.answer_format
+            if msg[-1]['role'] == 'user':
+                msg[-1]['content'] += "\n\n"+self.answer_format
+            elif msg[-2]['role'] == 'user':
+                msg[-2]['content'] += "\n\n"+self.answer_format
+            else:
+                raise ValueError("The last two messages are not from the user.")
         response = self.output_model.chat_complete(msg)
         action = Action(type=Response, content=response)
         return action, response

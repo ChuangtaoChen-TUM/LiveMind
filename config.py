@@ -1,5 +1,5 @@
 """ Configuration file """
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 # path to the MMLU-PRO dataset
 # /data2/NNdata/dataset/mmlu-pro/data/data/
 MMLU_PRO_PATH = "/data2/NNdata/dataset/mmlu-pro/data/data/"
@@ -10,7 +10,7 @@ LLAMA_3_8B_PATH = "/data2/NNdata/model_file/llama3/llama3_8b_instruct_awq/model/
 LLAMA_3_70B_PATH = "/data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/" # replace this with your own path
 # /data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/
 LLAMA_MODELS = ["llama-3-8b", "llama-3-70b"]
-OPENAI_MODELS = ["got-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+OPENAI_MODELS = ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
 ANTHROPIC_MODELS = ["claude-3-5-sonnet", "claude-3-opus", "claude-3-sonnet"]
 """
 The get model function should return a model with the following methods:
@@ -76,7 +76,7 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
         "llama-3-70b": LLAMA_3_70B_PATH
     }
     tensor_parallel_size = 1
-    gpu_memory_utilization = 0.9
+    gpu_memory_utilization = 0.6 if name == "llama-3-70b" else 0.3
     model_path = model_path_dict[name]
     if model_path == "":
         raise ValueError(f"Please set the model path for {name} in the config.py file")
@@ -95,11 +95,17 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
     )
     class Model(BaseModel):
         def chat_complete(self, message: list[dict]) -> str:
+            if len(message) > 0 and message[-1]["role"] == "assistant":
+                prefill = message[-1]["content"]
+                message = message[:-1]
+            else:
+                prefill = ""
             prompts = tokenizer.apply_chat_template(
                 [message,],
                 tokenize=False,
                 add_generation_prompt=True,
             )
+            prompts[0] = prompts[0] + prefill
             inputs = tokenizer.batch_encode_plus(
                 prompts
             )["input_ids"]
@@ -124,6 +130,10 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
                 skip_special_tokens=False
             )
             return generated_texts[0]
+        
+        @property
+        def support_prefill(self):
+            return True
 
     model_with_chat_complete = Model()
     return model_with_chat_complete
@@ -135,6 +145,9 @@ def get_model_openai_example(name: str) -> 'BaseModel':
     client = openai.OpenAI()
 
     class Model(BaseModel):
+        def __init__(self):
+            self.token_count = None
+
         def chat_complete(self, message):
             response = client.chat.completions.create(
                 model=name,
@@ -142,9 +155,14 @@ def get_model_openai_example(name: str) -> 'BaseModel':
                 temperature=0,
             )
             response_text = response.choices[0].message.content
+            self.token_count = response.usage
             if not response_text:
                 response_text = ""
             return response_text
+        
+        @property
+        def support_prefill(self):
+            return False
         
     model_with_chat_complete = Model()
     return model_with_chat_complete
@@ -178,6 +196,10 @@ def get_model_anthropic_example(name: str) -> 'BaseModel':
                     return text
             return ""
         
+        @property
+        def support_prefill(self):
+            return True
+
         @staticmethod
         def _convert_to_anthropic_format(message: list[dict[str, str]]):
             system_message = ""
@@ -199,4 +221,8 @@ class BaseModel(ABC):
     """ Base model class """
     @abstractmethod
     def chat_complete(self, message: list[dict[str, str]]) -> str:
+        pass
+
+    @abstractproperty
+    def support_prefill(self) -> bool:
         pass
