@@ -11,8 +11,8 @@ from live_mind.text import (
     TextStreamer,
     get_segmenter,
 )
-from live_mind.utils.dataset import GSM8kDataset, MMLUProDataset, BaseDataset
-from config import BaseModel, MMLU_PRO_PATH, GSM8K_PATH, get_model
+from live_mind.utils.dataset import GSM8kDataset, MMLUProDataset, BaseDataset, MMLUDataset
+from config import BaseModel, MMLU_PRO_PATH, GSM8K_PATH, MMLU_PATH, get_model
 
 
 def main(
@@ -71,15 +71,23 @@ def main(
             gen_time = 0.0
             step_actions = []
             start_time = time.time()
-            for response in resp_gen:
-                step_gen_time = time.time() - start_time
-                step_actions.append(response)
-                gen_time += step_gen_time
-                start_time = time.time()
+            response = ""
+            try:
+                for response in resp_gen:
+                    step_gen_time = time.time() - start_time
+                    step_actions.append(response)
+                    gen_time += step_gen_time
+                    start_time = time.time()
+            except ValueError:
+                streamer.flush()
+                stream_end = True
+                total_gen_time += gen_time
+                gen_time =  0.0
 
             if step_actions:
                 actions.append([new_prompt]+step_actions)
                 new_prompt = ""
+
             total_gen_time += gen_time
 
             if stream_end: # the stream ends
@@ -135,8 +143,9 @@ FORMAT_MAP = {
 }
 GRAUNLARITIES = ["char", "word", "sent", "clause"]
 DATASET_MAP = {
-    "mmlu-pro": MMLUProDataset,
-    "gsm8k": GSM8kDataset
+    "mmlu-pro": (MMLUProDataset, MMLU_PRO_PATH),
+    "gsm8k": (GSM8kDataset, GSM8K_PATH),
+    "mmlu": (MMLUDataset, MMLU_PATH),
 }
 
 DEFAULT_NUM_QUESTIONS = 1024
@@ -155,7 +164,6 @@ if __name__ == "__main__":
     parser.add_argument("-f",  "--output-file",   metavar="File", type=str, nargs="?", default=False, const=True, help="output results to a json file")
     parser.add_argument("-is", "--input-speed",   metavar="S",    type=int, default=DEFAULT_INPUT_SPEED, help=f"input speed in characters per minute, default: {DEFAULT_INPUT_SPEED}")
     parser.add_argument("--no-lm",   action="store_false",  dest="lm",   default=True,  help="disable LiveMind framework, use baseline solver instead")
-    parser.add_argument("--no-cot",  action="store_false",  dest="cot",  default=True,  help="disable chain-of-thoughts when using baseline solver")
     parser.add_argument("--no-wait", action="store_false",  dest="wait", default=True,  help="disable waiting for the model to generate the response")
     parser.add_argument("--log",     action="store_false",  dest="log",  default=False, help="log the results")
     parser.add_argument("-n", "--num-questions", metavar="N", type=int, default=DEFAULT_NUM_QUESTIONS, help=f"number of questions per category, -1 for all questions, default: {DEFAULT_NUM_QUESTIONS}")
@@ -167,17 +175,19 @@ if __name__ == "__main__":
     # check arguments
     # load the dataset
     dataset_name: str = args.dataset
-    if dataset_name == "mmlu-pro":
-        if not MMLU_PRO_PATH:
-            raise ValueError("Please set the path to the MMLU-Pro dataset in config.py")
-    elif dataset_name == "gsm8k":
-        if not GSM8K_PATH:
-            raise ValueError("Please set the path to the GSM8K dataset in config.py")
-    else:
-        raise ValueError("Invalid dataset, please choose either 'mmlu-pro' or 'gsm8k'")
+    if dataset_name not in DATASET_MAP:
+        raise ValueError(f"Invalid dataset, please choose from {', '.join(DATASET_MAP.keys())}")
+    dataset_class, dataset_path = DATASET_MAP[dataset_name]
+
+    if not dataset_path:
+        raise ValueError(f"Please set the path to the {dataset_name} dataset in config.py")
 
     num_questions = int(args.num_questions)
     assert num_questions == -1 or num_questions > 0
+
+    # load the dataset
+    dataset = dataset_class(dataset_path)
+    dataset.select(num_questions, randomize=True, seed=SEED, split='test')
 
     # check framework settings
     use_lm: bool = args.lm
@@ -194,8 +204,6 @@ if __name__ == "__main__":
         if out_model_name is None:
             print("Warning: --out-model is not set, use the inference model as output model")
             out_model_name = infer_model_name
-        if not args.cot:
-            print("Warning: --no-cot is set, when using LiveMind framework, the chain-of-thoughts setting will be ignored")
         if args.granularity not in ["sent", "clause"] and args.min_len != DEFAULT_MIN_LEN:
             print("Warning: --granularity is not 'sent' or 'clause', the minimum length will be ignored")
         if args.wait is not True and args.granularity not in ["sent", "clause"]:
@@ -227,13 +235,6 @@ if __name__ == "__main__":
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-
-    # load the dataset
-    if dataset_name == "mmlu-pro":
-        dataset: BaseDataset = MMLUProDataset(MMLU_PRO_PATH)
-    elif dataset_name == "gsm8k":
-        dataset = GSM8kDataset(GSM8K_PATH)
-    dataset.select(num_questions, randomize=True, seed=SEED, split='test')
 
     # set the solver
     if use_lm: # LiveMind framework
@@ -268,7 +269,7 @@ if __name__ == "__main__":
         output_model = get_model(out_model_name)
         inference_model = output_model
         controller = CompleteCoTController(
-            CoTFormatter(args.cot),
+            CoTFormatter(),
             output_model=output_model,
             answer_format=dataset.answer_format,
         )
@@ -287,7 +288,7 @@ if __name__ == "__main__":
                     wait_str = "wait"
                 output_file: str|None = f"./output/{dataset_name}/lm_{infer_model_name}_{out_model_name}_{args.prompt_format}_{g_str}_{input_speed_str}_{wait_str}_{num_q_str}.json"
             else:
-                cot_str = "cot" if args.cot else "no-cot"
+                cot_str = "cot"
                 output_file = f"./output/{dataset_name}/base_{out_model_name}_{cot_str}_{args.num_questions}q.json"
             print(f"-f is set but file name is not given, output to '{output_file}'")
         else:

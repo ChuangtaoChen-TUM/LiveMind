@@ -201,3 +201,4 @@ class CompleteCoTController(BaseController):
 
     def reset(self):
         pass
+

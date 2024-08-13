@@ -120,7 +120,7 @@ class LMFormatter(BaseFormatter):
 
 
 class CoTFormatter(BaseFormatter):
-    def __init__(self, use_cot: bool=False):
+    def __init__(self, use_cot: bool=True):
         self.use_cot = use_cot
 
 
@@ -140,7 +140,7 @@ class CoTFormatter(BaseFormatter):
         return msg
 
     def _format_output_sys(self) -> str:
-        """You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."""
+        """Your are a helpful assistant to solve a given problem. Solve the problem by thinking step by step."""
         return str(self._format_output_sys.__doc__)
 
 

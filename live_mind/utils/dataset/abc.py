@@ -14,7 +14,7 @@ class BaseDataset(ABC):
         pass
 
     @abstractmethod
-    def verify_answer(self, response: str, answer_text: str) -> bool:
+    def verify_answer(self, response: str, answer_text) -> bool:
         pass
 
     @abstractmethod

@@ -93,6 +93,25 @@ class TextStreamer(BaseTextStreamer):
         return self.index >= self.max_index
 
 
+    def flush(self) -> str|None:
+        """ Return the remaining text in the streamer, return `None` if no text is remaining.
+        The current time will be updated to the time when the last text is generated.
+        """
+        if self.index >= self.max_index:
+            return None
+
+        remaining_texts = self.text[self.index:]
+        remaining_text = "".join(remaining_texts)
+        self.index = self.max_index
+        delay = self.delay_fn(remaining_text)
+        self.last_gen_time += delay
+        self.current_time = self.last_gen_time
+
+        if self.final_text:
+            remaining_text += self.final_text
+        return remaining_text
+
+
     @staticmethod
     def split(text: str, granularity: str, **kwargs) -> list[str]:
         match granularity:

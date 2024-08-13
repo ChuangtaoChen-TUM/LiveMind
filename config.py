@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod, abstractproperty
 # path to the MMLU-PRO dataset
 # /data2/NNdata/dataset/mmlu-pro/data/data/
 MMLU_PRO_PATH = "/data2/NNdata/dataset/mmlu-pro/data/data/"
+# path to the MMLU dataset
+MMLU_PATH = "/data2/NNdata/dataset/mmlu/data/all/"
 # path to the GSM-8k dataset
 GSM8K_PATH = "/data2/NNdata/dataset/gsm8k/data/main"
 # config the model path if you use 'get_model_vllm_example'
@@ -10,7 +12,7 @@ LLAMA_3_8B_PATH = "/data2/NNdata/model_file/llama3/llama3_8b_instruct_awq/model/
 LLAMA_3_70B_PATH = "/data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/" # replace this with your own path
 # /data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/
 LLAMA_MODELS = ["llama-3-8b", "llama-3-70b"]
-OPENAI_MODELS = ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
 ANTHROPIC_MODELS = ["claude-3-5-sonnet", "claude-3-opus", "claude-3-sonnet"]
 """
 The get model function should return a model with the following methods:
@@ -85,11 +87,12 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
         tensor_parallel_size=tensor_parallel_size,
         gpu_memory_utilization=gpu_memory_utilization,
     )
+    max_tokens = 8192
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     stop_token_ids=[tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids("<|eot_id|>")]
     param = SamplingParams(
-        temperature=0,
-        max_tokens=8192,
+        temperature=0.0,
+        max_tokens=max_tokens,
         top_p=0.9,
         stop_token_ids=stop_token_ids,
     )
@@ -110,6 +113,10 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
                 prompts
             )["input_ids"]
             input = inputs[0]
+
+            if len(input) > max_tokens:
+                raise ValueError(f"Input length {len(input)} exceeds the maximum token length {max_tokens}")
+
             vllm_results = model.generate(
                 prompt_token_ids=inputs,
                 sampling_params=param,

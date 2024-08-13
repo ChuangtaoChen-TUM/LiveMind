@@ -1,7 +1,9 @@
 import gradio as gr
 import time
 import re
+from threading import Lock
 # from live_mind import LMController
+from live_mind import LMController
 from ..utils import ActionManager, form_prompt
 from ..session import Session
 CSS ="""
@@ -16,8 +18,7 @@ class LMGradioInterface:
         self.session = session
         self.assist_session = assist_session
         self.logger = logger
-        self.action_manager = ActionManager()
-        self.is_busy = False
+        self.lock = Lock()
         self.use_lm = use_lm
         self.on_mount()
 

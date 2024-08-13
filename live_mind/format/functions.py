@@ -44,8 +44,9 @@ The content should be relevant to content you are inferring based on the incompl
 def format_output_sys() -> str:
     """You are given a problem and previous inferences you have made about the problem to solve the problem.
 
-You should make the best use your previous inferences. Respond with your new inferences and your answer to the problem.
-You can answer directly if you can obtain the answer in your previous inferences, otherwise make minimal additional inferences to solve the problem."""
+You should make the best use your previous inferences to answer to the problem.
+
+You can answer directly if you can obtain the answer in your previous inferences, otherwise make additional inferences to solve the problem."""
     return str(format_output_sys.__doc__)
 
 
