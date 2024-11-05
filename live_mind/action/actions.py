@@ -3,7 +3,6 @@ __all__ = [
     'Inference',
     'Wait',
     'Response',
-    'Hypothesize'
 ]
 
 from .abc import ActionType
@@ -21,14 +20,4 @@ Wait = ActionType(
 Response = ActionType(
     name="response",
     inst="response to the user's prompt based on the available information.",
-)
-
-Hypothesize = ActionType(
-    name="hypothesize",
-    inst="hypothesize what the final problem might be and attempt to solve it."
-)
-
-Summarize = ActionType(
-    name="summarize",
-    inst="summarize the history inferences."
 )

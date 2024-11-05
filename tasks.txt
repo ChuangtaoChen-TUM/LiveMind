@@ -1,0 +1,56 @@
+#### MMLU-PRO ####
+
+# Baselines
+python run_solver.py --no-lm -o llama-3-70b -d mmlu-pro -f
+python run_solver.py --no-lm -o llama-3-8b -d mmlu-pro -f
+python run_solver.py --no-lm -o gpt-4o -d mmlu-pro -f
+
+# 70b-lm
+python run_solver.py -i llama-3-70b -o llama-3-70b -g sent -d mmlu-pro -f -pf u-pi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g sent -d mmlu-pro -f -pf u-pli
+python run_solver.py -i llama-3-70b -o llama-3-70b -g sent -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i llama-3-70b -o llama-3-70b -g sent -d mmlu-pro -f -pf u-spi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g sent -d mmlu-pro -f -pf ua-spi
+
+python run_solver.py -i llama-3-70b -o llama-3-70b -g clause -d mmlu-pro -f -pf u-pi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g clause -d mmlu-pro -f -pf u-pli
+python run_solver.py -i llama-3-70b -o llama-3-70b -g clause -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i llama-3-70b -o llama-3-70b -g clause -d mmlu-pro -f -pf u-spi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g clause -d mmlu-pro -f -pf ua-spi
+
+python run_solver.py -i llama-3-70b -o llama-3-70b -g word -d mmlu-pro -f -pf u-pi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g word -d mmlu-pro -f -pf u-pli
+python run_solver.py -i llama-3-70b -o llama-3-70b -g word -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i llama-3-70b -o llama-3-70b -g word -d mmlu-pro -f -pf u-spi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g word -d mmlu-pro -f -pf ua-spi
+
+python run_solver.py -i llama-3-70b -o llama-3-70b -g char -d mmlu-pro -f -pf u-pi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g char -d mmlu-pro -f -pf u-pli
+python run_solver.py -i llama-3-70b -o llama-3-70b -g char -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i llama-3-70b -o llama-3-70b -g char -d mmlu-pro -f -pf u-spi
+python run_solver.py -i llama-3-70b -o llama-3-70b -g char -d mmlu-pro -f -pf ua-spi
+
+
+# 70b+8b lm
+python run_solver.py -i llama-3-70b -o llama-3-8b -g sent -d mmlu-pro -f -pf u-pi
+python run_solver.py -i llama-3-70b -o llama-3-8b -g sent -d mmlu-pro -f -pf u-pli
+python run_solver.py -i llama-3-70b -o llama-3-8b -g sent -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i llama-3-70b -o llama-3-8b -g sent -d mmlu-pro -f -pf u-spi
+python run_solver.py -i llama-3-70b -o llama-3-8b -g sent -d mmlu-pro -f -pf ua-spi
+
+python run_solver.py -i llama-3-70b -o llama-3-8b -g clause -d mmlu-pro -f -pf u-pi
+python run_solver.py -i llama-3-70b -o llama-3-8b -g clause -d mmlu-pro -f -pf u-pli
+python run_solver.py -i llama-3-70b -o llama-3-8b -g clause -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i llama-3-70b -o llama-3-8b -g clause -d mmlu-pro -f -pf u-spi
+python run_solver.py -i llama-3-70b -o llama-3-8b -g clause -d mmlu-pro -f -pf ua-spi
+
+
+# gpt-4o lm
+python run_solver.py -i gpt-4o -o gpt-4o -g sent -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i gpt-4o -o gpt-4o -g sent -d mmlu-pro -f -pf ua-spi
+python run_solver.py -i gpt-4o -o gpt-4o -g clause -d mmlu-pro -f -pf ua-pil
+python run_solver.py -i gpt-4o -o gpt-4o -g clause -d mmlu-pro -f -pf ua-spi
+
+
+#### MMLU ####
+# Change the dataset to mmlu

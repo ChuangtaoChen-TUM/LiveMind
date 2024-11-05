@@ -1,10 +1,6 @@
 """ segmenters are functions that take a string and return a list of strings """
 __all__ = [
-    "char_segmenter",
-    "chunk_segmenter",
-    "nltk_sent_segmenter",
-    "nltk_comma_segmenter",
-    "nltk_word_segmenter",
+    'get_segmenter',
 ]
 
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -15,12 +11,6 @@ def get_segmenter(name: str, **kwargs) -> Callable[[str], list[str]]:
     match name:
         case "char":
             return char_segmenter
-
-        case "chunk":
-            chunk_size = kwargs.get("chunk_size", 10)
-            def segmenter(text: str) -> list[str]:
-                return chunk_segmenter(text, chunk_size)
-            return segmenter
 
         case "word":
             def segmenter(text: str) -> list[str]:
@@ -44,11 +34,6 @@ def get_segmenter(name: str, **kwargs) -> Callable[[str], list[str]]:
     
 def char_segmenter(text: str) -> list[str]:
     return list(text)
-
-
-def chunk_segmenter(text: str, chunk_size: int=10) -> list[str]:
-    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
-
 
 
 def nltk_word_segmenter(text):

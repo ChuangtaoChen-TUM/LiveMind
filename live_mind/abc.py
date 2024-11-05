@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from typing import Iterator
 
 class BaseModel(ABC):
     """ Base model class """
@@ -7,19 +7,14 @@ class BaseModel(ABC):
     def chat_complete(self, message: list[dict[str, str]]) -> str:
         pass
 
-
-class BaseController(ABC):
-    """ The base class for the controller in the live_mind framework:
-     the controller is responsible for generating the prompts to the LLM based on the user input.
-     if no prompt is generated, the controller should return `None`.
-
-    methods:
-    - `__call__`: generate the prompts based on the user input, use `stream_end` to indicate the end of the stream, return `None` if no prompt is generated.
-    """
+class BaseStreamModel(BaseModel):
+    """ Base stream model class """
     @abstractmethod
-    def __call__(self, prompt:str, stream_end:bool=False) -> Generator[str, None, None]:
-        pass
-
-    @abstractmethod
-    def reset(self):
+    def stream(self, message: list[dict[str, str]]) -> Iterator[str]:
+        """ Stream the response of the model
+        - args:
+            - message (`list[dict[str, str]]`): the message to be sent to the model
+        - returns:
+            - `Iterator[str]`: the response of the model
+        """
         pass

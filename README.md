@@ -30,137 +30,73 @@
 - [Contents](#contents)
 - [Reproduce Experimental Results](#reproduce-experimental-results)
   - [Configurations](#configurations)
-  - [Run real-time estimation](#run-real-time-estimation)
-  - [Run batched inference](#run-batched-inference)
+  - [Environment Configuration and Version Details](#environment-configuration-and-version-details)
+  - [Reproduce the experimental results](#reproduce-the-experimental-results)
   - [Result analysis](#result-analysis)
-    - [Real-time latency measure](#real-time-latency-measure)
-    - [Batched inference](#batched-inference)
-  - [Action analysis](#action-analysis)
-    - [Action percentage](#action-percentage)
-    - [Action set](#action-set)
 - [Playground](#playground)
-  - [Gradio Demo](#gradio-demo)
-  - [Textual Demo](#textual-demo)
+    - [Run Local LLama Models](#run-local-llama-models)
+    - [Run OPENAI Models](#run-openai-models)
+    - [Example](#example)
 - [Citation](#citation)
 ## Reproduce Experimental Results
 ### Configurations
 Install required packages:
 ```
-pip install datasets alive_progress nltk
+pip install datasets nltk tqdm
 ```
-Before running the script, you need to change the following configurations in `live_mind/config.py` to set the LLMs and datasets:
-1. `MMLU_PRO_PATH`: path to the MMLU-Pro dataset, the path should contains `.parquet` dataset files;
-2. Implement the `get_model` method: you can use your own model here as long it has the required method (see `live_mind/config.py`);
-3. You can also use the `get_model_vllm_example` implementation;
-4. To use the `get_model_vllm_example` function, you need to specify the paths `LLAMA_3_8B_PATH` and `LLAMA_3_70B_PATH`. A `config.json` file and `tokenizer.json` file should be found in these paths. Besides, make sure the packages `vllm` and `transformers` are installed.
-```
-pip install vllm transformers
-```
+Before running the script, you need to change the following configurations in `config.py` to set the LLMs and datasets:
+1. `MMLU_PATH/MMLU_PRO_PATH`: path to the MMLU/MMLU-Pro dataset, the path should contains `.parquet` dataset files; 
+2. To run `Llama-3-70B-Instruct` and `Llama-3-8B-Instruct` models, specify the paths `LLAMA_3_8B_PATH` and `LLAMA_3_70B_PATH` in the `config.py` file. A `config.json` file and `tokenizer.json` file should be found in these paths. Besides, make sure the packages `vllm` and `transformers` are installed;
+3. To run OPENAI and CLAUDE models, make sure you have installed the required packages and set the api-keys. For more information, refer to the corresponding documents on their websites.
+4. You can also use your own model, by configuring the `get_model` method: you can use your own model here as long it has the required method by `BaseModel` (see `config.py`);
 
-5. Models used in the paper: [Llama-3-70B](https://huggingface.co/casperhansen/llama-3-70b-instruct-awq/), [Llama-3-8B](https://huggingface.co/casperhansen/llama-3-8b-instruct-awq/)
+### Environment Configuration and Version Details
+1. The version of `gpt-4o` model used in the paper is `gpt-4o-2024-05-13`.
+2. Local models used in the paper are in 4-bit AWQ quantized versions and can be downloaded from [Llama-3-70B-Instruct](https://huggingface.co/casperhansen/llama-3-70b-instruct-awq/), [Llama-3-8B-Instruct](https://huggingface.co/casperhansen/llama-3-8b-instruct-awq/)
+3. The version of the `vllm` module is `0.5.3.post1`
+4. The python version for the experiments is `Python 3.11.9 [GCC 9.4.0]`.
+5.  The operating system and kernel used for the experiments is `Ubuntu 20.04.6 LTS Kernel: Linux 5.4.0-187-generic`.
 
-### Run real-time estimation
-Run the following commands to reproduce the results of real-time estimation:
-```
-python run_solver.py --model llama-3-70b --use_lm --output_file ./output/mmlu_pro/time_info/llama_3_70b_lm/all.json
-python run_solver.py --model llama-3-70b --output_file ./output/mmlu_pro/time_info/llama_3_70b_base/all.json
-python run_solver.py --model llama-3-70b --assist_model llama-3-8b --use_lm --action_set SAS --output_file ./output/mmlu_pro/time_info/llama_3_70b_w_8b_lm/all.json
-python run_solver.py --model llama-3-8b --output_file ./output/mmlu_pro/time_info/llama_3_8b_base/all.json
-```
-### Run batched inference
-Run the following commands to reproduce the results of batched inference:
-```
-python run_batch_solver.py --model llama-3-70b --use_lm --output_file ./output/mmlu_pro/batched/llama_3_70b_lm/all.json
-python run_batch_solver.py --model llama-3-70b --output_file ./output/mmlu_pro/batched/llama_3_70b_base/all.json
-python run_batch_solver.py --model llama-3-70b --use_lm --assist_model llama-3-8b --action_set SAS --output_file ./output/mmlu_pro/batched/llama_3_70b_w_8b_lm/all.json
-python run_batch_solver.py --model llama-3-8b --output_file ./output/mmlu_pro/batched/llama_3_8b_base/all.json
-```
+### Reproduce the experimental results
+To run an experiment, use command `python run_solver ...`. Use `python run_solver.py -h` for more information.
+
+Commands to reproduce the results in the paper are listed in the `tasks.txt` file. See `tasks.txt` for more information.
 
 ### Result analysis
-Run the following commands to analyze the output files and reproduce the experiment results:
-#### Real-time latency measure
-```
-python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_70b_lm/all.json
-python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_70b_base/all.json
-python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_70b_w_8b_lm/all.json
-python analyze_time_info.py ./output/mmlu_pro/time_info/llama_3_8b_base/all.json
-```
+We provide a script to analyze the results, such as accuracy, latency and generation time. Use `python analyze.py <result_json_file>` to evalute the results. You can use glob pattern to analyze multiple files, for example:
 
-This step will create two csv files: `timeinfo_by_category.csv` and `timeinfo_by_len.csv` at each folder with the `all.json` file.
-#### Batched inference
 ```
-python analyze_batched.py ./output/mmlu_pro/batched/llama_3_70b_lm/all.json
-python analyze_batched.py ./output/mmlu_pro/batched/llama_3_70b_base/all.json
-python analyze_batched.py ./output/mmlu_pro/batched/llama_3_70b_w_8b_lm/all.json
-python analyze_batched.py ./output/mmlu_pro/batched/llama_3_8b_base/all.json
+python analyze.py ./output/mmlu/**sent**
 ```
-This step will create two csv files: `timeinfo_by_category.csv` and `timeinfo_by_len.csv` at each folder with the `all.json` file.
-
-### Action analysis
-Run the following commands to reproduce the results present in Sec. 4.4 in the paper:
-
-#### Action percentage
-```
-python analyze_actions.py ./output/mmlu_pro/batched/llama_3_70b_lm/all.json
-python analyze_actions.py ./output/mmlu_pro/batched/llama_3_70b_w_8b_lm/all.json
-```
-This step will create two csv files: `actions_per_step` and `actions_per_len` in these two folders, corresponding to the data presented in Fig. 8.
-
-#### Action set
-To reproduce the results in Table 2, first run the batched inference with the following configurations:
-```
-python run_batch_solver.py --model llama-3-8b --use_lm --action_set CAS --output_file ./output/mmlu_pro/ablation/llama_3_8b_lm_comp/all.json
-python run_batch_solver.py --model llama-3-8b --use_lm --action_set SAS --output_file ./output/mmlu_pro/ablation/llama_3_8b_lm_simp/all.json
-python run_batch_solver.py --model llama-3-8b --use_lm --assist_model llama-3-70b --action_set CAS --output_file ./output/mmlu_pro/ablation/llama_3_8b_w_70b_lm_comp/all.json
-python run_batch_solver.py --model llama-3-8b --use_lm --assist_model llama-3-70b --action_set SAS --output_file ./output/mmlu_pro/ablation/llama_3_8b_w_70b_lm_simp/all.json
-python run_batch_solver.py --model llama-3-70b --use_lm --action_set SAS --output_file ./output/mmlu_pro/ablation/llama_3_70b_lm_simp/all.json
-python run_batch_solver.py --model llama-3-70b --use_lm --assist_model llama-3-8b --action_set CAS --output_file ./output/mmlu_pro/ablation/llama_3_70b_w_8b_lm_simp/all.json
-```
-
-Then run `python analyze_batched.py **/all.json` to report the results.
 
 ## Playground
-We impleted a demo with [gradio](https://www.gradio.app/) and [textual](https://textual.textualize.io/). **In the demos, you can interact with LLMs through the LiveMind framework, allowing the LLM to take actions as you type in the text box!**
-To run the demo, you need to install `vllm` and `transformers`:
-```
-pip install vllm transformers
-```
-To run the demo in gradio, you need to install `gradio`; to run the demo in `textual`, you need to install `textual` (you can select either):
-```
-pip install textual
-pip install gradio
-```
-then, set the model paths in `playground/config.py` with your own model paths. The paths should contain a `config.json` file and a `tokenizer.json` file. You can download the models from huggingface. For example, [Llama-3-70B](https://huggingface.co/casperhansen/llama-3-70b-instruct-awq/), [Llama-3-8B](https://huggingface.co/casperhansen/llama-3-8b-instruct-awq/).
-### Gradio Demo
-Run the demo in **gradio**, use
-```
-python run_playground.py --gradio --model llama-3-70b --use_lm
-```
-Type your message in the text box and press enter to send the message, you can change wether to use the `LiveMind` (LM) framework by clicking the checkbox.
+We provide an interactive playground implemented with **Gradio** framework.
+To run the playground, make sure you have installed the `gradio` module.
 
-<p align="center">
-  <img src="./res/04_gradio_demo.png" alt="drawing" width="500"/>
-</p>
+Use `python run_playground.py --help` for more information.
 
-In `LiveMind` inference mode, the model can perform inferences when you are typing. The actions performed are displayed in the **Actions** textbox. You can also include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
+#### Run Local LLama Models
+To use the `llama-3-8b, llama-3-70b` model, you need to configure the model paths `LLAMA_3_8B_PATH` and `LLAMA_3_70B_PATH` in the `config.py` file and have the following modules installed:
+`transformers, vllm` 
 
-You can use `--assist_model [model_name]` to use a different model as the output model, as mentioned in the paper.
-
-### Textual Demo
-You can also run the demo implemented with [textual](https://textual.textualize.io/) in your terminal, simply use:
-```
-python run_playground.py --textual --model llama-3-70b --use_lm
-```
-when using `--use_lm`, the model is running in LiveMind mode, which means it can inference when you are typing. Click the **send** button to send the message.
-
-<p align="center">
-  <img src="./res/02_demo_lm.png" alt="drawing" width="500"/>
-</p>
+*The playground was tested on an Nvidia A100 80G, if you have enough memory but experience out-of-memory problem, consider change the memory utilization value (default: 0.6 for Llama-3-70B and 0.3 for Llama-3-8B) in `./playground/vllm_session/__init__/MODEL_DICT`*
 
 
-The actions performed by the LLM are not displayed in the chat window. To see the model actions, include `--log` when launching the demo, then the actions will be logged in the log file `playground/log.log`.
+#### Run OPENAI Models
+To use OPENAI models, you need to install `openai` and set your API key using:
+`export OPENAI_API_KEY="xxxxxxx"`.
 
-If you do not include `--use_lm`, the chat will be running in normal mode without the LiveMind framework.
+#### Example
+After setting the environment, you can run the playground and chat with the LLM. For example: `python run_playground.py -i llama-3-70b`
+
+You can see the following interface:
+![alt text](/playground/example.png)
+
+You can type in the input textbox, and inferences made by the model will be displayed in the Action box in real-time. When you press enter to send the message, a response will be given in the chat_box area.
+
+You can hide the action box (the inferences will still be made in background) or disable the LM framework by unchecking the check-boxes.
+
+*Notice: currently we only support one round conversation (thought it is not difficult to extend the framework to multi-round conversations)*
 
 ## Citation
 

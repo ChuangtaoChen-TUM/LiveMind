@@ -5,14 +5,15 @@ import pathlib
 import argparse
 import time
 from tqdm import tqdm
-from live_mind import LMController, CompleteCoTController, BaseController
-from live_mind.format.formatter import LMFormatter, CoTFormatter, LMFormat
+from live_mind import LMController, CompleteController
+from live_mind.controller.abc import BaseController
+from live_mind.formatter import LMFormatter, CoTFormatter, LMFormat
 from live_mind.text import (
     TextStreamer,
     get_segmenter,
 )
-from live_mind.utils.dataset import GSM8kDataset, MMLUProDataset, BaseDataset, MMLUDataset
-from config import BaseModel, MMLU_PRO_PATH, GSM8K_PATH, MMLU_PATH, get_model
+from live_mind.utils.dataset import MMLUProDataset, BaseDataset, MMLUDataset
+from config import BaseModel, MMLU_PRO_PATH, MMLU_PATH, get_model
 
 
 def main(
@@ -20,10 +21,9 @@ def main(
     inference_model: BaseModel,
     output_model: BaseModel,
     dataset: BaseDataset,
-    input_speed: int,
+    input_speed: int, # characters per minute
     output_file: str|None=None,
 ):
-    """ Run the solver on the MMLU Pro dataset and log the results if needed. """
     # warm up the models
     inference_model.chat_complete([{"role": "user", "content": "Hello"}])
     output_model.chat_complete([{"role": "user", "content": "Hello"}])
@@ -130,45 +130,38 @@ def main(
         with open(output_file, "w", encoding='utf-8') as file:
             json.dump(entry_list, file, indent=4)
 
+
 FORMAT_MAP = {
     "u-pi"  : LMFormat.U_PI,
     "u-pli" : LMFormat.U_PLI,
-    # "u-pil" : LMFormat.U_PIL,
-    # "u-ip"  : LMFormat.U_IP,
-    # "u-ipl" : LMFormat.U_IPL,
     "ua-pil": LMFormat.UA_PIL,
     "u-spi" : LMFormat.U_SPI,
     "ua-spi": LMFormat.UA_SPI,
-    # "ua-pf" : LMFormat.UA_PF,
 }
 GRAUNLARITIES = ["char", "word", "sent", "clause"]
 DATASET_MAP = {
     "mmlu-pro": (MMLUProDataset, MMLU_PRO_PATH),
-    "gsm8k": (GSM8kDataset, GSM8K_PATH),
     "mmlu": (MMLUDataset, MMLU_PATH),
 }
 
 DEFAULT_NUM_QUESTIONS = 1024
-DEFAULT_SUM_LEN = -1
-DEFAULT_MIN_LEN = 10
+DEFAULT_MIN_LEN = 10 # combine sentences or clauses that are too short
 DEFAULT_INPUT_SPEED = 240 # characters per minute
 SEED = 42
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i",  "--infer-model",   metavar="M",    type=str, default=None, help="inference model: llama-3-8b, llama-3-70b")
-    parser.add_argument("-o",  "--out-model",     metavar="M",    type=str, default=None, help="output model: llama-3-8b, llama-3-70b")
+    parser.add_argument("-i",  "--infer-model",   metavar="M",    type=str, default=None, help="inference model")
+    parser.add_argument("-o",  "--out-model",     metavar="M",    type=str, default=None, help="output model")
     parser.add_argument("-pf", "--prompt-format", metavar="FMT",  type=str, default=None, choices=FORMAT_MAP.keys(), help=f"prompt format, can be {', '.join(FORMAT_MAP.keys())}")
     parser.add_argument("-g",  "--granularity",   metavar="G",    type=str, default=None, choices=GRAUNLARITIES, help=f"granularity of the text streamer, can be {', '.join(GRAUNLARITIES)}")
     parser.add_argument("-d",  "--dataset",       metavar="D",    type=str, default=None, choices=DATASET_MAP.keys(), help=f"dataset to run the solver on, can be {', '.join(DATASET_MAP.keys())}")
     parser.add_argument("-f",  "--output-file",   metavar="File", type=str, nargs="?", default=False, const=True, help="output results to a json file")
     parser.add_argument("-is", "--input-speed",   metavar="S",    type=int, default=DEFAULT_INPUT_SPEED, help=f"input speed in characters per minute, default: {DEFAULT_INPUT_SPEED}")
     parser.add_argument("--no-lm",   action="store_false",  dest="lm",   default=True,  help="disable LiveMind framework, use baseline solver instead")
-    parser.add_argument("--no-wait", action="store_false",  dest="wait", default=True,  help="disable waiting for the model to generate the response")
     parser.add_argument("--log",     action="store_false",  dest="log",  default=False, help="log the results")
     parser.add_argument("-n", "--num-questions", metavar="N", type=int, default=DEFAULT_NUM_QUESTIONS, help=f"number of questions per category, -1 for all questions, default: {DEFAULT_NUM_QUESTIONS}")
     parser.add_argument("--min-len",             metavar="N", type=int, default=DEFAULT_MIN_LEN, help=f"minimum length of the segment if using sent or clause granularity, default: {DEFAULT_MIN_LEN}")
-    # parser.add_argument("--sum-len",             metavar="N", type=int, default=DEFAULT_SUM_LEN,       help=f"summarization length, default: {DEFAULT_SUM_LEN}")
     parser.add_argument("--overwrite", action="store_true", help="overwrite the output file if it exists")
     args = parser.parse_args()
 
@@ -206,9 +199,6 @@ if __name__ == "__main__":
             out_model_name = infer_model_name
         if args.granularity not in ["sent", "clause"] and args.min_len != DEFAULT_MIN_LEN:
             print("Warning: --granularity is not 'sent' or 'clause', the minimum length will be ignored")
-        if args.wait is not True and args.granularity not in ["sent", "clause"]:
-            print("Warning: granularity is not 'sent' or 'clause', the waiting setting will be ignored")
-            args.wait = True
     else: # baseline
         if out_model_name is None:
             raise ValueError("Please specify the output model")
@@ -220,10 +210,6 @@ if __name__ == "__main__":
             print("Warning: --no-lm is set, the granularity will be ignored")
         if args.min_len != DEFAULT_MIN_LEN:
             print("Warning: --no-lm is set, the minimum length will be ignored")
-        if args.wait is not True:
-            print("Warning: --no-lm is set, the waiting setting will be ignored")
-        # if args.sum_len != DEFAULT_SUM_LEN:
-        #     print("Warning: --no-lm is set, the summarization length will be ignored")
 
     # logger configuration
     logger: logging.Logger|None = None
@@ -250,25 +236,19 @@ if __name__ == "__main__":
             seg_kwargs = {}
         segmenter = get_segmenter(args.granularity, **seg_kwargs)
         format = FORMAT_MAP[args.prompt_format]
-        formmatter = LMFormatter(format, args.wait)
-
-        if format == LMFormat.UA_PF:
-            if not inference_model.support_prefill or not output_model.support_prefill:
-                raise ValueError("The model does not support prefilling, please choose a different prompt format")
+        formmatter = LMFormatter(format)
 
         controller: BaseController = LMController(
             segmenter,
             formmatter,
             inference_model,
             output_model,
-            # summarize_len=args.sum_len,
             answer_format=dataset.answer_format,
-            logger=logger
         )
     else: # baseline
         output_model = get_model(out_model_name)
         inference_model = output_model
-        controller = CompleteCoTController(
+        controller = CompleteController(
             CoTFormatter(),
             output_model=output_model,
             answer_format=dataset.answer_format,
@@ -279,17 +259,11 @@ if __name__ == "__main__":
         if args.output_file: # output file set but not given
             if use_lm:
                 g_str = args.granularity
-                # sum_str = f"sum-{args.sum_len}" if args.sum_len != DEFAULT_SUM_LEN else "no-sum"
                 num_q_str = f"{args.num_questions}q"
                 input_speed_str = f"{args.input_speed}cpm"
-                if args.wait is not True:
-                    wait_str = "no-wait"
-                else:
-                    wait_str = "wait"
-                output_file: str|None = f"./output/{dataset_name}/lm_{infer_model_name}_{out_model_name}_{args.prompt_format}_{g_str}_{input_speed_str}_{wait_str}_{num_q_str}.json"
+                output_file: str|None = f"./output/{dataset_name}/lm_{infer_model_name}_{out_model_name}_{args.prompt_format}_{g_str}_{input_speed_str}_{num_q_str}.json"
             else:
-                cot_str = "cot"
-                output_file = f"./output/{dataset_name}/base_{out_model_name}_{cot_str}_{args.num_questions}q.json"
+                output_file = f"./output/{dataset_name}/base_{out_model_name}_{args.num_questions}q.json"
             print(f"-f is set but file name is not given, output to '{output_file}'")
         else:
             output_file = None

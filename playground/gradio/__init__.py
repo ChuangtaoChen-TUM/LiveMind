@@ -1,135 +1,90 @@
+__all__ = ["LMGradioInterface"]
+
 import gradio as gr
-import time
-import re
 from threading import Lock
-# from live_mind import LMController
-from live_mind import LMController
-from ..utils import ActionManager, form_prompt
-from ..session import Session
+from live_mind.controller.abc import BaseStreamController
 CSS ="""
 .contain { display: flex; flex-direction: column; }
 .gradio-container { height: 100vh !important; }
 #component-0 { height: 100%; }
 #chatbot { flex-grow: 1; overflow: auto;}
 """
-SYS_MSG_BASE = "You are a helpful AI assistant, and your tasks is to understand and solve a problem. Solve the problem by thinking step by step."
 class LMGradioInterface:
-    def __init__(self, session: Session, assist_session: Session|None = None, use_lm: bool=True, logger=None):
-        self.session = session
-        self.assist_session = assist_session
-        self.logger = logger
+    def __init__(
+        self,
+        lm_controller: BaseStreamController,
+        base_controller: BaseStreamController
+    ):
+        self.lm_controller = lm_controller
+        self.base_controller = base_controller
         self.lock = Lock()
-        self.use_lm = use_lm
+        self.use_lm = True
+        self.infer_msg = ""
+        self.input_msg = ""
         self.on_mount()
 
     def on_mount(self):
-        if self.assist_session:
-            title = f"{self.session.model_name}+{self.assist_session.model_name}"
-        else:
-            title = self.session.model_name
+        title = "Live Mind Chat Interface"
         with gr.Blocks(css=CSS, title=title) as demo:
             chatbot = gr.Chatbot(elem_id="chatbot")
             infer_box = gr.Textbox("", interactive=False, label="Actions", max_lines=15)
             msg = gr.Textbox(placeholder="Type here...", label="Input")
             clear = gr.Button("Clear")
             use_lm = gr.Checkbox(label="Use LM framework", value=self.use_lm)
-            def user(user_message, history):
-                return "", history + [[user_message, None]], ""
+            show_infer = gr.Checkbox(label="Show inference", value=True)
 
-            def bot(history, use_lm):
-                converted_history = convert_history(history)
-                if use_lm:
-                    new_prompts = form_prompt(
-                        converted_history[-1]["content"],
-                        converted_history[:-1],
-                        self.action_manager,
-                        is_completed=True
-                    )
-                else:
-                    new_prompts = [{"role": "system", "content": SYS_MSG_BASE},] + converted_history
-                while self.is_busy:
-                    time.sleep(0.1)
-                self.is_busy = True
-                history[-1][1] = ""
-                if use_lm and self.assist_session:
-                    self.assist_session.chat_complete(new_prompts)
-                    streamer = self.assist_session.stream()
-                else:
-                    self.session.chat_complete(new_prompts)
-                    streamer = self.session.stream()
-                for next_text in streamer:
-                    history[-1][1] += next_text
-                    yield history
-                self.is_busy = False
+            def clear_input(msg):
+                self.input_msg += msg
+                return ""
 
+            def update_input():
+                self.input_msg += "\n"
 
-            def save_action(text):
-                pattern = r"^action ([a-z]+).[ \n]*(.*)$"
-                response = text
-                matched = re.match(pattern, response, re.DOTALL)
-                if matched:
-                    if matched.group(1) not in ["background", "inference", "hypothesize", "wait"]:
-                        return
-                    if matched.group(1) == "wait":
-                        self.action_manager.write_action("")
-                    else:
-                        self.action_manager.write_action(response)
-                else:
+            def action_submit(use_lm, chatbot):
+                chatbot += [[self.input_msg, ""]]
+                with self.lock:
+                    controller = self.lm_controller if use_lm else self.base_controller
+                    for response in controller.iter_call(self.input_msg, stream_end=True):
+                        for text in response:
+                            chatbot[-1][1] += text
+                            yield chatbot
+                    yield chatbot
+
+            def action_change(text, use_lm):
+                if not use_lm:
                     return
 
-            def action_change(text, use_lm, infer_box):
-                if not use_lm or self.is_busy:
-                    yield infer_box
-                    return
-                actions, prompts = self.action_manager.read_action(
-                    text, save_prompts=True
-                )
-                infer_box = "\n".join(actions)
-                if prompts is None or len(actions) >= len(prompts):
-                    yield infer_box
-                    return
+                with self.lock:
+                    text = self.input_msg + text
+                    for response in self.lm_controller.iter_call(text):
+                        if self.infer_msg != "":
+                            self.infer_msg += "\n"
+                        for s in response:
+                            self.infer_msg += s
+                            yield self.infer_msg
+                    yield self.infer_msg
 
-                self.is_busy = True
-                new_prompts = form_prompt(
-                    text,
-                    convert_history(chatbot.value),
-                    self.action_manager,
-                    is_completed=False
-                )
-                self.session.chat_complete(new_prompts)
-                response = ""
-                if infer_box:
-                    infer_box += "\n"
-                for next_text in self.session.stream():
-                    response += next_text
-                    infer_box += next_text
-                    yield infer_box
-                yield infer_box
-                if self.logger:
-                    self.logger.info(response)
-                self.is_busy = False
-                save_action(response)
+            def action_clear():
+                self.infer_msg = ""
+                self.input_msg = ""
+                self.base_controller.reset()
+                self.lm_controller.reset()
+                return None, self.infer_msg
 
+            def change_visibility(show_infer):
+                value = show_infer
+                if value:
+                    return gr.Textbox(visible=True)
+                else:
+                    return gr.Textbox(visible=False)
 
-            msg.submit(user, [msg, chatbot], [msg, chatbot, infer_box], queue=False).then(
-                bot, [chatbot, use_lm], chatbot
-            )
-
-            msg.change(action_change, [msg, use_lm, infer_box], [infer_box], show_progress=False)
-            clear.click(lambda: None, None, chatbot, queue=False)
+            msg.submit(clear_input, [msg], msg, queue=True).then(action_submit, [use_lm, chatbot], [chatbot], queue=True).then(update_input, [], queue=True)
+            msg.change(action_change, [msg, use_lm], infer_box, show_progress=False, queue=True)
+            clear.click(action_clear, [], [chatbot, infer_box], queue=True)
+            show_infer.change(change_visibility, show_infer, infer_box, show_progress=False)
         self.demo = demo
-    
+
+
     def run(self):
         demo = self.demo
-        demo.queue()
         demo.launch()
-
-
-def convert_history(history:list[list[str]]) -> list[dict]:
-    result = []
-    for dialog in history:
-        if dialog[0]:
-            result.append({"role": "user", "content": dialog[0]})
-        if dialog[1]:
-            result.append({"role": "assistant", "content": dialog[1]})
-    return result

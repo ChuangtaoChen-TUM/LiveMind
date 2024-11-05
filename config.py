@@ -1,54 +1,19 @@
 """ Configuration file """
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
+
+# the dataset path should contain the `.parquet` files
 # path to the MMLU-PRO dataset
-# /data2/NNdata/dataset/mmlu-pro/data/data/
-MMLU_PRO_PATH = "/data2/NNdata/dataset/mmlu-pro/data/data/"
+MMLU_PRO_PATH = ""
 # path to the MMLU dataset
-MMLU_PATH = "/data2/NNdata/dataset/mmlu/data/all/"
-# path to the GSM-8k dataset
-GSM8K_PATH = "/data2/NNdata/dataset/gsm8k/data/main"
+MMLU_PATH = ""
 # config the model path if you use 'get_model_vllm_example'
-LLAMA_3_8B_PATH = "/data2/NNdata/model_file/llama3/llama3_8b_instruct_awq/model/" # replace this with your own path
-LLAMA_3_70B_PATH = "/data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/" # replace this with your own path
-# /data2/NNdata/model_file/llama3/llama3_70b_instruct_awq/model/
+# the model path should contain a `config.json` file
+LLAMA_3_8B_PATH = "" # replace this with your own path
+LLAMA_3_70B_PATH = "" # replace this with your own path
+
 LLAMA_MODELS = ["llama-3-8b", "llama-3-70b"]
 OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
 ANTHROPIC_MODELS = ["claude-3-5-sonnet", "claude-3-opus", "claude-3-sonnet"]
-"""
-The get model function should return a model with the following methods:
-- chat_complete: takes a message and returns a response
-the response format is similar to OpenAI's API.
-
-for example:
-model = get_model("llama-3-8b")
-message = [
-    {
-        "role": "system",
-        "content": "This is a system message."
-    },
-    {
-        "role": "user",
-        "content": "This is message 2."
-    }
-]
-response: dict = model.chat_complete(message)
-
-the response is a dict and should have the following format:
-{
-    "choices": [
-        {
-            "message": {
-                "content": "This is a response message."
-            }
-        }
-    ],
-    "usage": {
-        "completion_tokens": 20,
-        "prompt_tokens": 30,
-        "total_tokens": 50
-    }
-}
-"""
 
 def get_model(name: str):
     assert name in LLAMA_MODELS + OPENAI_MODELS + ANTHROPIC_MODELS, f"Model {name} is not supported."
@@ -93,29 +58,24 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
     param = SamplingParams(
         temperature=0.0,
         max_tokens=max_tokens,
-        top_p=0.9,
         stop_token_ids=stop_token_ids,
     )
     class Model(BaseModel):
         def chat_complete(self, message: list[dict]) -> str:
-            if len(message) > 0 and message[-1]["role"] == "assistant":
-                prefill = message[-1]["content"]
-                message = message[:-1]
-            else:
-                prefill = ""
+            assert len(message) == 0 or message[-1]["role"] == "user"
             prompts = tokenizer.apply_chat_template(
                 [message,],
                 tokenize=False,
                 add_generation_prompt=True,
             )
-            prompts[0] = prompts[0] + prefill
+            prompts[0] = prompts[0]
             inputs = tokenizer.batch_encode_plus(
                 prompts
             )["input_ids"]
             input = inputs[0]
 
             if len(input) > max_tokens:
-                raise ValueError(f"Input length {len(input)} exceeds the maximum token length {max_tokens}")
+                raise ValueError
 
             vllm_results = model.generate(
                 prompt_token_ids=inputs,
@@ -124,9 +84,6 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
             )
             vllm_result = vllm_results[0]
             result = vllm_result.prompt_token_ids+list(vllm_result.outputs[0].token_ids)
-            # remove the input tokens from the output
-            assert len(result) >= len(input)
-            assert result[:len(input)] == input
             result = result[len(input):]
             if len(result) > 0 and result[-1] in stop_token_ids:
                 result = result[:-1]
@@ -137,10 +94,6 @@ def get_model_vllm_example(name: str) -> 'BaseModel':
                 skip_special_tokens=False
             )
             return generated_texts[0]
-        
-        @property
-        def support_prefill(self):
-            return True
 
     model_with_chat_complete = Model()
     return model_with_chat_complete
@@ -151,9 +104,10 @@ def get_model_openai_example(name: str) -> 'BaseModel':
     assert name in OPENAI_MODELS, f"Model {name} is not supported."
     client = openai.OpenAI()
 
+    if name == "gpt-4o":
+        name = "gpt-4o-2024-05-13"
+        print("setting the model to gpt-4o-2024-05-13")
     class Model(BaseModel):
-        def __init__(self):
-            self.token_count = None
 
         def chat_complete(self, message):
             response = client.chat.completions.create(
@@ -162,19 +116,15 @@ def get_model_openai_example(name: str) -> 'BaseModel':
                 temperature=0,
             )
             response_text = response.choices[0].message.content
-            self.token_count = response.usage
             if not response_text:
                 response_text = ""
             return response_text
-        
-        @property
-        def support_prefill(self):
-            return False
-        
+
     model_with_chat_complete = Model()
     return model_with_chat_complete
 
 def get_model_anthropic_example(name: str) -> 'BaseModel':
+    # this has not been tested
     import anthropic
     assert name in ANTHROPIC_MODELS, f"Model {name} is not supported."
     model_name_dict = {
@@ -198,14 +148,11 @@ def get_model_anthropic_example(name: str) -> 'BaseModel':
             )
             if response.content:
                 response_text = response.content[0]
+                assert isinstance(response_text, anthropic.types.TextBlock)
                 text = response_text.text
                 if isinstance(text, str):
                     return text
             return ""
-        
-        @property
-        def support_prefill(self):
-            return True
 
         @staticmethod
         def _convert_to_anthropic_format(message: list[dict[str, str]]):
@@ -228,8 +175,9 @@ class BaseModel(ABC):
     """ Base model class """
     @abstractmethod
     def chat_complete(self, message: list[dict[str, str]]) -> str:
+        """ The message should be a list of dictionaries with the following keys:
+        - role: "system", "user", or "assistant" (all these roles should be supported)
+        - content: the content of the message
+        """
         pass
 
-    @abstractproperty
-    def support_prefill(self) -> bool:
-        pass

@@ -5,7 +5,6 @@ __all__ = ["TextStreamer"]
 
 from collections.abc import Callable
 from typing import Optional
-from .segmenter import nltk_sent_segmenter
 from .abc import BaseTextStreamer
 
 class TextStreamer(BaseTextStreamer):
@@ -25,7 +24,7 @@ class TextStreamer(BaseTextStreamer):
         final_text: Optional[str] = None,
         config: dict = {}, # additional configuration for the generator
     ):
-        assert granularity in ["char", "chunk", "token", "sentence"]
+        assert granularity in ["char", "chunk", "token"]
         self.delay_fn = delay_fn
         self.text = self.split(text, granularity, **config)
         self.final_text = final_text
@@ -125,7 +124,5 @@ class TextStreamer(BaseTextStreamer):
                 return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
             case "token":
                 raise NotImplementedError("token granularity is not implemented yet.")
-            case "sentence":
-                return nltk_sent_segmenter(text)
             case _:
                 raise ValueError(f"granularity {granularity} is not supported.")

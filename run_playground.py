@@ -1,45 +1,60 @@
 import argparse
-import logging
-from playground.session import Session
-from playground.textual import LiveMindTextual
+from playground import get_stream_model, SUPPORTED_MODELS
 from playground.gradio import LMGradioInterface
+from live_mind.formatter import LMFormat, LMFormatter, CoTFormatter
+from live_mind import LMStreamController, CompleteStreamController
+from live_mind.text import get_segmenter
+
+FORMAT_MAP = {
+    "u-pi"  : LMFormat.U_PI,
+    "u-pli" : LMFormat.U_PLI,
+    "ua-pil": LMFormat.UA_PIL,
+    "u-spi" : LMFormat.U_SPI,
+    "ua-spi": LMFormat.UA_SPI,
+}
+GRAUNLARITIES = ["char", "word", "sent", "clause"]
+DEFAULT_MIN_LEN = 3
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the chat interface")
-    parser.add_argument("--textual", action="store_true", help="Run the textual interface")
-    parser.add_argument("--gradio", action="store_true", help="Run the Gradio interface")
-    parser.add_argument("--model", type=str, help="inference model")
-    parser.add_argument("--assist_model", type=str, help="assist model")
-    parser.add_argument("--use_lm", action="store_true", help="Use LiveMind framework")
-    parser.add_argument("--log", action="store_true", help="Enable logging")
+    parser.add_argument("-i",  "--infer-model",   metavar="M",    type=str, default="llama-3-70b", help=f"inference model, default: llama-3-70b, supported: {', '.join(SUPPORTED_MODELS)}")
+    parser.add_argument("-o",  "--out-model",     metavar="M",    type=str, default=None, help=f"output model, default: same as inference model, supported: {', '.join(SUPPORTED_MODELS)}")
+    parser.add_argument("-pf", "--prompt-format", metavar="FMT",  type=str, default="ua-spi", choices=FORMAT_MAP.keys(), help=f"prompt format, can be {', '.join(FORMAT_MAP.keys())}")
+    parser.add_argument("-g",  "--granularity",   metavar="G",    type=str, default="clause", choices=GRAUNLARITIES, help=f"granularity of the text streamer, can be {', '.join(GRAUNLARITIES)}")
+    parser.add_argument("--log",     action="store_false",  dest="log",  default=False, help="log the results")
+    parser.add_argument("--min-len",             metavar="N", type=int, default=DEFAULT_MIN_LEN, help=f"minimum length of the segment if using sent or clause granularity, default: {DEFAULT_MIN_LEN}")
+
     args = parser.parse_args()
 
-    model_name = args.model
-    assist_model_name = args.assist_model
-    if assist_model_name == model_name:
-        raise ValueError("Model and assist model cannot be the same")
-    if not args.use_lm and assist_model_name:
-        print("Warning: assist model will not be used without LiveMind framework")
-        assist_model_name = None
-    if args.textual and args.gradio:
-        raise ValueError("Only one interface can be selected")
-    if args.log:
-        logger: logging.Logger|None = logging.getLogger('playground_logger')
-        assert isinstance(logger, logging.Logger)
-        logger.setLevel(logging.INFO)
-        file_handler = logging.FileHandler('./playground/log.log')
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    infer_model_name = args.infer_model
+    out_model_name = args.out_model
+
+    if not infer_model_name:
+        raise ValueError("Please specify the inference model")
+    if not out_model_name:
+        print("Warning: output model is not specified, using inference model as output model")
+        out_model_name = infer_model_name
+    infer_model = get_stream_model(infer_model_name)
+    if infer_model_name != out_model_name:
+        out_model = get_stream_model(out_model_name)
     else:
-        logger = None
-    if args.textual:
-        session = Session(model_name)
-        assist_session = Session(assist_model_name) if assist_model_name else None
-        textual_interface = LiveMindTextual(session, assist_session, args.use_lm, logger)
-        textual_interface.run()
-    if args.gradio:
-        session = Session(model_name)
-        assist_session = Session(assist_model_name) if assist_model_name else None
-        gradio_interface = LMGradioInterface(session, assist_session, args.use_lm, logger)
-        gradio_interface.run()
+        out_model = infer_model
+
+
+    prompt_format = FORMAT_MAP[args.prompt_format]
+    formatter = LMFormatter(prompt_format)
+    if args.granularity in ["sent", "clause"]:
+        seg_kwargs = {"min_len": args.min_len}
+    else:
+        seg_kwargs = {}
+    segmenter = get_segmenter(args.granularity, **seg_kwargs)
+    lm_controller = LMStreamController(
+        segmenter=segmenter,
+        formatter=formatter,
+        infer_model=infer_model,
+        output_model=out_model,
+    )
+    base_controller = CompleteStreamController(CoTFormatter(), out_model)
+
+    app = LMGradioInterface(lm_controller, base_controller)
+    app.run()
