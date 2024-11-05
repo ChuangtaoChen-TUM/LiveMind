@@ -1,6 +1,5 @@
 .vscode/
 **.pyc
 **/__pycache__/
-deprecated/
 /output/
-tasks.sh
+**/.mypy_cache/
