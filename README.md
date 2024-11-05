@@ -7,10 +7,11 @@
     XunZhao Yin<sup>3</sup>,
     Cheng Zhuo<sup>3</sup>,
     Ulf Schlichtmann<sup>1</sup>,
-    Bing Li<sup>1</sup><br>
-    <sup>1</sup>Technical University of Munich<br>
+    Bing Li<sup>4</sup><br>
+    <sup>1</sup>Technical University of Munich,
     <sup>2</sup>Technical University of Darmstadt<br>
-    <sup>3</sup>Zhejiang Univerity
+    <sup>3</sup>Zhejiang Univerity,
+    <sup>4</sup>University of Siegen
 </p>
 
 
